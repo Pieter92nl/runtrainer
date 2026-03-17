@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="HM Trainer">
+<meta name="theme-color" content="#08080A">
+<title>HM Trainer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+--bg:#08080A;--s1:#111114;--s2:#1B1B20;--s3:#26262D;
+--text:#EEEEF0;--t2:#A0A0AC;--t3:#66666F;
+--orange:#FF6B35;--orangeDim:rgba(255,107,53,.10);
+--teal:#2DD4BF;--tealDim:rgba(45,212,191,.10);
+--blue:#6C9EFF;--blueDim:rgba(108,158,255,.10);
+--yellow:#FACC15;--yellowDim:rgba(250,204,21,.10);
+--red:#FF5C5C;--redDim:rgba(255,92,92,.10);
+--green:#34D399;--greenDim:rgba(52,211,153,.10);
+--grey:#8B8B96;--greyDim:rgba(139,139,150,.10);
+--font:'DM Sans',system-ui,-apple-system,sans-serif;
+--mono:'JetBrains Mono','SF Mono',monospace;
+--safe-b:env(safe-area-inset-bottom,0px)}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:var(--font);-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent}
+body{display:flex;flex-direction:column}
+#app{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:calc(76px + var(--safe-b))}
+input,textarea,button{font-family:var(--font);-webkit-appearance:none}
+.sync-dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-left:6px;vertical-align:middle}
+.sync-dot.ok{background:var(--green)}.sync-dot.saving{background:var(--yellow);animation:pulse 1s infinite}.sync-dot.err{background:var(--red)}.sync-dot.off{background:var(--t3)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.login-screen{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:40px 24px;text-align:center}
+.login-screen h1{font-size:32px;font-weight:700;margin-bottom:8px;letter-spacing:-.03em}
+.login-screen h1 span{color:var(--orange)}
+.login-screen p{color:var(--t2);font-size:15px;margin-bottom:32px;line-height:1.6;max-width:300px}
+.login-btn{padding:16px 32px;border:none;border-radius:14px;background:var(--orange);color:#000;font-size:16px;font-weight:700;cursor:pointer;font-family:var(--font);display:flex;align-items:center;gap:10px}
+.login-sub{margin-top:16px;font-size:12px;color:var(--t3);max-width:260px;line-height:1.5}
+.nav{position:fixed;bottom:0;left:0;right:0;z-index:200;background:rgba(8,8,10,.94);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border-top:1px solid var(--s3);display:flex;padding-bottom:var(--safe-b)}
+.nav button{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:11px 0 9px;background:none;border:none;color:var(--t3);font-size:10px;font-weight:600;cursor:pointer}
+.nav button.on{color:var(--orange)}
+.nav button svg{width:22px;height:22px}
+.hdr{position:sticky;top:0;z-index:100;background:var(--bg);padding:14px 20px 0;border-bottom:1px solid var(--s2)}
+.hdr-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+.hdr h1{font-size:22px;font-weight:700;letter-spacing:-.03em}
+.hdr h1 span{color:var(--orange)}
+.badge{font-size:12px;font-weight:600;color:var(--orange);background:var(--orangeDim);padding:5px 12px;border-radius:20px;display:flex;align-items:center;gap:4px}
+.pills{display:flex;gap:7px;overflow-x:auto;padding-bottom:14px;scrollbar-width:none}
+.pills::-webkit-scrollbar{display:none}
+.pill{flex-shrink:0;padding:7px 16px;border-radius:20px;font-size:13px;font-weight:600;background:var(--s2);color:var(--t3);border:none;cursor:pointer}
+.pill.on{background:var(--orange);color:#000}.pill.done{background:var(--s3);color:var(--text)}
+.phase{padding:16px 20px 6px;display:flex;align-items:center;gap:9px}
+.phase .dot{width:9px;height:9px;border-radius:50%}
+.phase .lbl{font-size:14px;font-weight:700}
+.phase .dt{margin-left:auto;font-size:13px;color:var(--t3)}
+.vol{padding:2px 20px 18px;display:flex;align-items:center;gap:16px}
+.vol .num{font-size:30px;font-weight:700;letter-spacing:-.04em;line-height:1}
+.vol .num span{font-size:15px;font-weight:500;color:var(--t2);margin-left:3px}
+.vol .bar-w{flex:1;display:flex;align-items:center;gap:10px}
+.vol .bar{flex:1;height:6px;background:var(--s3);border-radius:4px;overflow:hidden}
+.vol .bar div{height:100%;border-radius:4px;transition:width .4s}
+.vol .pct{font-size:13px;font-weight:700;min-width:38px;text-align:right}
+.cards{padding:0 16px;display:flex;flex-direction:column;gap:10px}
+.card{background:var(--s1);border-radius:16px;padding:18px;border:1px solid rgba(255,255,255,.03);cursor:pointer}
+.card.logged{border-color:rgba(255,255,255,.07)}
+.card-top{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+.card-ico{width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.card-ico.lt2{background:var(--orangeDim)}.card-ico.long{background:var(--tealDim)}.card-ico.easy{background:var(--greyDim)}
+.card-title{font-size:16px;font-weight:700;line-height:1.2;margin-bottom:2px}
+.card-desc{font-size:14px;color:var(--t2);line-height:1.4}
+.card-check{width:26px;height:26px;border-radius:50%;border:2px solid var(--s3);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0;color:transparent}
+.card-check.done{border-color:var(--green);background:var(--green);color:#000}
+.card-metrics{display:flex;gap:14px;font-size:14px;font-weight:600}
+.card-tip{font-size:13px;color:var(--orange);background:var(--orangeDim);padding:8px 12px;border-radius:10px;line-height:1.5;margin-top:6px}
+.card-log{display:flex;gap:10px;margin-top:12px;padding-top:12px;border-top:1px solid var(--s2);font-size:13px;color:var(--t2);align-items:center;flex-wrap:wrap}
+.tag{background:var(--s2);padding:3px 10px;border-radius:7px;font-weight:600}
+.stars{color:var(--yellow);letter-spacing:1px}
+.overlay{position:fixed;inset:0;z-index:300;background:rgba(0,0,0,.55);backdrop-filter:blur(4px);display:none}
+.overlay.open{display:block}
+.sheet{position:fixed;bottom:0;left:0;right:0;z-index:301;background:var(--s1);border-radius:22px 22px 0 0;padding:20px 22px calc(24px + var(--safe-b));max-height:88vh;overflow-y:auto;transform:translateY(100%);transition:transform .3s cubic-bezier(.32,.72,0,1)}
+.sheet.open{transform:translateY(0)}
+.sheet-bar{width:40px;height:5px;border-radius:3px;background:var(--s3);margin:0 auto 18px}
+.sheet h2{font-size:20px;font-weight:700;margin-bottom:4px}
+.sheet .sub{font-size:14px;color:var(--t2);margin-bottom:20px}
+.hint{font-size:13px;padding:8px 12px;border-radius:10px;margin-bottom:18px;line-height:1.5}
+.hint.lt2{color:var(--orange);background:var(--orangeDim)}.hint.other{color:var(--teal);background:var(--tealDim)}
+.field{margin-bottom:20px}
+.field label{display:block;font-size:12px;font-weight:700;color:var(--t2);margin-bottom:8px;text-transform:uppercase;letter-spacing:.06em}
+.field input,.field textarea{width:100%;background:var(--s2);border:1px solid var(--s3);border-radius:12px;padding:14px 16px;font-size:16px;color:var(--text);outline:none}
+.field input:focus,.field textarea:focus{border-color:var(--orange)}
+.field textarea{resize:none;min-height:80px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.feels{display:flex;gap:8px}
+.feel{width:52px;height:52px;border-radius:14px;font-size:22px;cursor:pointer;border:2px solid var(--s3);background:var(--s2);display:flex;align-items:center;justify-content:center}
+.feel.sel{border-color:var(--yellow);background:var(--yellowDim)}
+.btn-save{width:100%;padding:16px;border:none;border-radius:14px;background:var(--orange);color:#000;font-size:16px;font-weight:700;cursor:pointer}
+.btn-del{width:100%;padding:12px;border:none;background:none;color:var(--red);font-size:14px;font-weight:600;cursor:pointer;margin-top:4px}
+.page-hdr{position:sticky;top:0;z-index:100;background:var(--bg);padding:14px 20px 16px;border-bottom:1px solid var(--s2)}
+.page-hdr h1{font-size:22px;font-weight:700}
+.section{padding:16px}
+.icard{background:var(--s1);border-radius:16px;padding:20px;margin-bottom:12px;border:1px solid rgba(255,255,255,.04)}
+.icard h3{font-size:12px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:14px}
+.big{font-size:36px;font-weight:700;letter-spacing:-.04em}.big span{font-size:16px;color:var(--t2);font-weight:500}
+.legend{display:flex;gap:16px;font-size:11px;color:var(--t3);margin-top:14px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:middle}
+.info-val{font-size:24px;font-weight:700;color:var(--orange);margin-bottom:4px}
+.info-p{font-size:14px;color:var(--t2);line-height:1.7}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.04em;text-align:left;padding:8px 6px;border-bottom:1px solid var(--s3)}
+th:nth-child(n+2){text-align:right}td{padding:10px 6px;border-bottom:1px solid var(--s2)}td:nth-child(n+2){text-align:right}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<nav class="nav" id="nav" style="display:none"></nav>
+<div class="overlay" id="ov"></div>
+<div class="sheet" id="sh"></div>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script>
+const CLIENT_ID="868840897372-n2gdl6vg4cvo4kqmoh6hdp0addf0snmu.apps.googleusercontent.com";
+const SCOPES="https://www.googleapis.com/auth/drive.appdata";
+const DAPI="https://www.googleapis.com/drive/v3";
+const UAPI="https://www.googleapis.com/upload/drive/v3";
+const FNAME="hm-trainer-data.json";
+
+const P=[
+{n:10,d:"23–29 mrt",km:40,ph:"Wennen",pc:"blue",s:[{t:"lt2",ti:"LT2 Drempel",de:"3×9 min @ LT2 + 2×90s herstel",km:11,wk:6.5,tip:"Focus op hartslag, niet tempo"},{t:"long",ti:"Lange Duurloop",de:"Zone 2 bovenkant",km:15},{t:"easy",ti:"Easy Run 1",de:"Zone 1–2, rustig",km:8},{t:"easy",ti:"Easy Run 2",de:"Zone 1, herstel",km:6}]},
+{n:9,d:"30 mrt–5 apr",km:43,ph:"Opbouw",pc:"blue",s:[{t:"lt2",ti:"LT2 Drempel",de:"3×11 min @ LT2 + 2×90s herstel",km:12,wk:7.9,tip:"Monitor of hartslag stabiel blijft"},{t:"long",ti:"Lange Duurloop",de:"Zone 2 bovenkant",km:16},{t:"easy",ti:"Easy Run 1",de:"Zone 1–2",km:8},{t:"easy",ti:"Easy Run 2",de:"Zone 1",km:7}]},
+{n:8,d:"6–12 apr",km:45,ph:"Opbouw",pc:"blue",s:[{t:"lt2",ti:"LT2 Drempel",de:"3×11 min @ LT2 + 2×90s herstel",km:12,wk:7.9,tip:"Zelfde als vorige week — beter voelen"},{t:"long",ti:"Lange Duurloop",de:"Zone 2 bovenkant",km:17},{t:"easy",ti:"Easy Run 1",de:"Zone 1–2",km:9},{t:"easy",ti:"Easy Run 2",de:"Zone 1",km:7}]},
+{n:7,d:"13–19 apr",km:38,ph:"Herstelweek",pc:"yellow",s:[{t:"lt2",ti:"LT2 Drempel",de:"2×11 min @ LT2 + 1×90s herstel",km:9.5,wk:5.3,tip:"Bewust rustiger — herstelweek"},{t:"long",ti:"Lange Duurloop",de:"Zone 1–2 rustig",km:14},{t:"easy",ti:"Easy Run 1",de:"Zone 1, rustig",km:8},{t:"easy",ti:"Easy Run 2",de:"Zone 1",km:6.5}]},
+{n:6,d:"20–26 apr",km:47,ph:"Piek opbouw",pc:"red",s:[{t:"lt2",ti:"LT2 Drempel",de:"2×17 min @ LT2 + 1×90s herstel",km:12.5,wk:8.2,tip:"17 min vraagt meer mentale focus"},{t:"long",ti:"Lange Duurloop",de:"Zone 2 bovenkant",km:18},{t:"easy",ti:"Easy Run 1",de:"Zone 1–2",km:9},{t:"easy",ti:"Easy Run 2",de:"Zone 1–2",km:7.5}]},
+{n:5,d:"27 apr–3 mei",km:50,ph:"Volume piek",pc:"red",s:[{t:"lt2",ti:"LT2 Drempel",de:"2×20 min @ LT2 + 1×90s herstel",km:13.5,wk:9.6,tip:"Piekvolume. Uitstapclausule beschikbaar"},{t:"long",ti:"Lange Duurloop",de:"Zone 2 bovenkant",km:19},{t:"easy",ti:"Easy Run 1",de:"Zone 1–2",km:10},{t:"easy",ti:"Easy Run 2",de:"Zone 1–2",km:7}]},
+{n:4,d:"4–10 mei",km:47,ph:"Race-specifiek",pc:"green",s:[{t:"lt2",ti:"LT2 Drempel",de:"1×35 min continu @ LT2",km:12,wk:8.4,tip:"Zwaarste sessie. Boven 183 bpm → vertraag"},{t:"long",ti:"Lange Duurloop",de:"Zone 2",km:18},{t:"easy",ti:"Easy Run 1",de:"Zone 1–2",km:10},{t:"easy",ti:"Easy Run 2",de:"Zone 1–2",km:7}]},
+{n:3,d:"11–17 mei",km:43,ph:"Race-specifiek",pc:"green",s:[{t:"lt2",ti:"LT2 Drempel",de:"1×25 min continu @ LT2",km:9.5,wk:6,tip:"Begin taper — niet harder dan nodig"},{t:"long",ti:"Lange Duurloop",de:"Zone 2",km:17},{t:"easy",ti:"Easy Run 1",de:"Zone 1–2",km:9},{t:"easy",ti:"Easy Run 2",de:"Zone 1",km:7.5}]},
+{n:2,d:"18–24 mei",km:35,ph:"Taper",pc:"grey",s:[{t:"lt2",ti:"LT2 Drempel",de:"2×10 min @ LT2 + 1×90s herstel",km:8.5,wk:4.8,tip:"Benen activeren, niet belasten"},{t:"long",ti:"Lange Duurloop",de:"Zone 2 rustig",km:13},{t:"easy",ti:"Easy Run 1",de:"Zone 1",km:8},{t:"easy",ti:"Easy Run 2",de:"Zone 1",km:5.5}]},
+{n:1,d:"25–31 mei",km:25,ph:"Raceweek",pc:"green",s:[{t:"lt2",ti:"LT2 Opener",de:"1×8 min @ LT2",km:5,wk:1.9,tip:"Benen bijhouden, NIET presteren"},{t:"long",ti:"Activeringsloop",de:"Zone 1–2",km:10},{t:"easy",ti:"Easy Run",de:"Zone 1",km:7},{t:"easy",ti:"Optioneel",de:"Zone 1",km:3}]}
+];
+const pC={blue:"var(--blue)",yellow:"var(--yellow)",red:"var(--red)",green:"var(--green)",grey:"var(--grey)"};
+const tI={lt2:"⚡",long:"🛤️",easy:"🏃"};
+const FE=["😵","😓","😐","😊","🔥"];
+const K=(wi,si)=>`w${P[wi].n}-${si}`;
+const $=id=>document.getElementById(id);
+
+let tab="plan",wi=0,log={},token=null,fileId=null,syncState="off";
+const today=new Date(),ws=[new Date(2026,2,23),new Date(2026,2,30),new Date(2026,3,6),new Date(2026,3,13),new Date(2026,3,20),new Date(2026,3,27),new Date(2026,4,4),new Date(2026,4,11),new Date(2026,4,18),new Date(2026,4,25)];
+for(let i=ws.length-1;i>=0;i--){if(today>=ws[i]){wi=i;break;}}
+try{const s=localStorage.getItem("hm-log");if(s)log=JSON.parse(s);}catch(e){}
+
+// ═══ GOOGLE DRIVE ═══
+let tokenClient;
+function initGoogle(){
+  if(typeof google==="undefined"||!google.accounts){setTimeout(initGoogle,200);return;}
+  tokenClient=google.accounts.oauth2.initTokenClient({client_id:CLIENT_ID,scope:SCOPES,callback:onToken,error_callback:()=>{syncState="err";render();}});
+  const st=localStorage.getItem("hm-gtoken");
+  if(st){try{const t=JSON.parse(st);if(t.exp>Date.now()){token=t.tk;syncState="ok";loadDrive();}}catch(e){}}
+  render();
+}
+function onToken(r){
+  if(r.error){syncState="err";render();return;}
+  token=r.access_token;
+  localStorage.setItem("hm-gtoken",JSON.stringify({tk:token,exp:Date.now()+(r.expires_in*1000)-60000}));
+  syncState="ok";$("nav").style.display="flex";loadDrive();
+}
+function doLogin(){if(tokenClient)tokenClient.requestAccessToken({prompt:"consent"});}
+function doLogout(){token=null;fileId=null;syncState="off";localStorage.removeItem("hm-gtoken");$("nav").style.display="none";render();}
+
+async function findFile(){
+  try{const r=await fetch(`${DAPI}/files?spaces=appDataFolder&q=name='${FNAME}'&fields=files(id)`,{headers:{"Authorization":"Bearer "+token}});
+  if(!r.ok){if(r.status===401){token=null;syncState="off";render();}return null;}
+  const d=await r.json();return d.files?.length?d.files[0].id:null;}catch(e){return null;}}
+
+async function loadDrive(){
+  if(!token)return;syncState="saving";render();
+  try{fileId=await findFile();
+  if(fileId){const r=await fetch(`${DAPI}/files/${fileId}?alt=media`,{headers:{"Authorization":"Bearer "+token}});
+  if(r.ok){const d=await r.json();if(d&&typeof d==="object"){log=d;localStorage.setItem("hm-log",JSON.stringify(log));}}}
+  syncState="ok";}catch(e){syncState="err";}render();
+}
+
+async function saveDrive(){
+  if(!token){syncState="off";return;}syncState="saving";render();
+  localStorage.setItem("hm-log",JSON.stringify(log));
+  try{const fm=new FormData();
+  if(!fileId){
+    fm.append("metadata",new Blob([JSON.stringify({name:FNAME,parents:["appDataFolder"]})],{type:"application/json"}));
+    fm.append("file",new Blob([JSON.stringify(log)],{type:"application/json"}));
+    const r=await fetch(`${UAPI}/files?uploadType=multipart`,{method:"POST",headers:{"Authorization":"Bearer "+token},body:fm});
+    if(r.ok){const d=await r.json();fileId=d.id;syncState="ok";}else{syncState=r.status===401?(token=null,"off"):"err";}
+  }else{
+    fm.append("metadata",new Blob(["{}"],{type:"application/json"}));
+    fm.append("file",new Blob([JSON.stringify(log)],{type:"application/json"}));
+    const r=await fetch(`${UAPI}/files/${fileId}?uploadType=multipart`,{method:"PATCH",headers:{"Authorization":"Bearer "+token},body:fm});
+    if(r.ok)syncState="ok";else syncState=r.status===401?(token=null,"off"):"err";}
+  }catch(e){syncState="err";}render();
+}
+let svT=null;
+function save(){localStorage.setItem("hm-log",JSON.stringify(log));if(svT)clearTimeout(svT);svT=setTimeout(saveDrive,1000);}
+
+// ═══ RENDER ═══
+function syncDot(){return`<span class="sync-dot ${syncState}"></span>`;}
+function render(){
+  if(!token){$("nav").style.display="none";
+  $("app").innerHTML=`<div class="login-screen"><h1>HM <span>Trainer</span></h1><p>10-weken trainingsplan voor de halve marathon op 31 mei 2026</p>
+  <button class="login-btn" onclick="doLogin()"><svg viewBox="0 0 24 24" width="20" height="20" fill="none"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.27-4.74 3.27-8.1z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>Inloggen met Google</button>
+  <p class="login-sub">Je trainingslog wordt veilig opgeslagen in je eigen Google Drive. Alleen deze app heeft toegang.</p></div>`;return;}
+  $("nav").style.display="flex";
+  $("nav").innerHTML=[{id:"plan",l:"Plan",d:"M3 4h18a2 2 0 012 2v14a2 2 0 01-2 2H3a2 2 0 01-2-2V6a2 2 0 012-2zm13-2v4M8 2v4M3 10h18"},{id:"insights",l:"Inzichten",d:"M22 12h-4l-3 9L9 3l-3 9H2"},{id:"info",l:"Profiel",d:"M12 2a10 10 0 100 20 10 10 0 000-20zm0 14v-4m0-4h.01"}].map(t=>`<button class="${tab===t.id?"on":""}" onclick="tab='${t.id}';render()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="${t.d}"/></svg><span>${t.l}</span></button>`).join("");
+  if(tab==="plan")renderPlan();else if(tab==="insights")renderInsights();else renderInfo();
+}
+
+// ═══ PLAN ═══
+function renderPlan(){
+  const w=P[wi],wL=w.s.reduce((a,_,i)=>{const l=log[K(wi,i)];return a+(l?l.km:0);},0),pct=Math.min(100,Math.round(wL/w.km*100));
+  $("app").innerHTML=`<div class="hdr"><div class="hdr-row"><h1>HM <span>Trainer</span></h1><div class="badge">31 mei 2026${syncDot()}</div></div>
+  <div class="pills">${P.map((wk,i)=>{const dn=wk.s.every((_,si)=>log[K(i,si)]);return`<button class="pill ${i===wi?"on":""} ${dn?"done":""}" onclick="wi=${i};render()">W${wk.n}</button>`;}).join("")}</div></div>
+  <div class="phase"><div class="dot" style="background:${pC[w.pc]}"></div><span class="lbl" style="color:${pC[w.pc]}">${w.ph}</span><span class="dt">${w.d}</span></div>
+  <div class="vol"><div class="num">${w.km}<span>km</span></div><div class="bar-w"><div class="bar"><div style="width:${pct}%;background:${pct>=100?"var(--green)":"var(--orange)"}"></div></div><span class="pct" style="color:${pct>=100?"var(--green)":"var(--t2)"}">${pct}%</span></div></div>
+  <div class="cards">${w.s.map((s,i)=>{const l=log[K(wi,i)],lt=s.t==="lt2";return`<div class="card ${l?"logged":""}" onclick="openLog(${wi},${i})"><div class="card-top"><div class="card-ico ${s.t}">${tI[s.t]}</div><div style="flex:1"><div class="card-title">${s.ti}</div><div class="card-desc">${s.de}</div></div><div class="card-check ${l?"done":""}">${l?"✓":""}</div></div><div class="card-metrics"><span style="font-family:var(--mono);color:var(--t2)">${s.km} km</span>${s.wk?`<span style="color:var(--orange)">LT2: ${s.wk} km</span>`:""}</div>${s.tip?`<div class="card-tip">${s.tip}</div>`:""}${l?`<div class="card-log"><span class="tag">${l.km} km</span>${l.hr?`<span class="tag">${lt?"⚡ ":""}${l.hr} bpm</span>`:""}${l.pace?`<span class="tag" style="font-family:var(--mono)">${lt?"⚡ ":""}${l.pace}/km</span>`:""}<span class="stars">${"★".repeat(l.feel)+"☆".repeat(5-l.feel)}</span>${l.notes?`<span style="color:var(--t3);font-style:italic">${l.notes.substring(0,35)}${l.notes.length>35?"…":""}</span>`:""}</div>`:""}</div>`;}).join("")}</div><div style="height:24px"></div>`;
+  setTimeout(()=>{const p=document.querySelector(".pill.on");if(p)p.scrollIntoView({behavior:"smooth",inline:"center",block:"nearest"});},50);
+}
+
+// ═══ LOG SHEET ═══
+let shWi,shSi,shFeel=3;
+function openLog(w,s){shWi=w;shSi=s;const ss=P[w].s[s],ex=log[K(w,s)],lt=ss.t==="lt2";shFeel=ex?.feel??3;
+$("sh").innerHTML=`<div class="sheet-bar"></div><h2>${ss.ti}</h2><div class="sub">Week ${P[w].n} — ${ss.de}</div>
+<div class="hint ${lt?"lt2":"other"}">${lt?"⚡ Vul tempo en hartslag van de LT2-intervallen in, niet van de hele activiteit":"Vul het gemiddelde van de hele activiteit in"}</div>
+<div class="field"><label>${lt?"Totale afstand incl. w-up/c-down":"Afstand"} (km)</label><input type="number" step="0.1" id="f-km" value="${ex?.km??ss.km}" inputmode="decimal"></div>
+<div class="grid2"><div class="field"><label>${lt?"HR intervallen":"Gem. HR"} (bpm)</label><input type="number" id="f-hr" value="${ex?.hr??""}" placeholder="—" inputmode="numeric"></div>
+<div class="field"><label>${lt?"Pace intervallen":"Gem. Pace"} (m:ss)</label><input type="text" id="f-pace" value="${ex?.pace??""}" placeholder="${lt?"4:10":"5:30"}" inputmode="text"></div></div>
+<div class="field"><label>Gevoel</label><div class="feels">${[1,2,3,4,5].map(n=>`<button class="feel ${n===shFeel?"sel":""}" onclick="pickFeel(${n})">${FE[n-1]}</button>`).join("")}</div></div>
+<div class="field"><label>Notities</label><textarea id="f-notes" placeholder="Hoe voelde het?">${ex?.notes??""}</textarea></div>
+<button class="btn-save" onclick="saveLog()">Opslaan</button>${ex?`<button class="btn-del" onclick="delLog()">Verwijderen</button>`:""}`;
+$("ov").classList.add("open");$("sh").classList.add("open");}
+function pickFeel(n){shFeel=n;document.querySelectorAll(".feel").forEach((b,i)=>b.classList.toggle("sel",i+1===n));}
+function saveLog(){log[K(shWi,shSi)]={km:parseFloat($("f-km").value)||0,hr:parseInt($("f-hr").value)||0,pace:$("f-pace").value.trim(),feel:shFeel,notes:$("f-notes").value.trim()};closeSheet();save();render();}
+function delLog(){delete log[K(shWi,shSi)];closeSheet();save();render();}
+function closeSheet(){$("ov").classList.remove("open");$("sh").classList.remove("open");}
+$("ov").onclick=closeSheet;
+
+// ═══ INSIGHTS ═══
+function pp(s){if(!s)return null;const p=s.split(":");if(p.length===2){const m=parseInt(p[0]),sec=parseInt(p[1]);if(!isNaN(m)&&!isNaN(sec))return m*60+sec;}return null;}
+function renderInsights(){
+  const wd=P.map((w,wIdx)=>{let pKm=w.km,aKm=0,l2P=0,l2A=0,loP=0,loA=0,eP=0,eA=0,l2H=[],aH=[],feels=[];
+  w.s.forEach((s,si)=>{const l=log[K(wIdx,si)];if(s.t==="lt2"){l2P+=s.km;if(l){l2A+=l.km;if(l.hr>0)l2H.push(l.hr);}}
+  if(s.t==="long"){loP+=s.km;if(l){loA+=l.km;if(l.hr>0)aH.push(l.hr);}}
+  if(s.t==="easy"){eP+=s.km;if(l){eA+=l.km;if(l.hr>0)aH.push(l.hr);}}
+  if(l){aKm+=l.km;feels.push(l.feel);}});
+  const av=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:null;
+  return{n:w.n,pc:w.pc,pKm,aKm,l2P,l2A,loP,loA,eP,eA,l2HR:l2H.length?Math.round(av(l2H)):null,aHR:aH.length?Math.round(av(aH)):null,feel:av(feels),sL:feels.length};});
+  const tP=wd.reduce((a,w)=>a+w.pKm,0),tA=wd.reduce((a,w)=>a+w.aKm,0),tS=wd.reduce((a,w)=>a+w.sL,0),mx=Math.max(...wd.map(w=>Math.max(w.pKm,w.aKm)));
+
+  $("app").innerHTML=`<div class="page-hdr"><div style="display:flex;justify-content:space-between;align-items:center"><h1>Inzichten</h1><span style="font-size:13px;color:var(--t2)">${tS} sessies${syncDot()}</span></div></div>
+  <div class="section">
+  <div class="icard"><h3>Totale voortgang</h3><div class="big">${tA.toFixed(1)} <span>/ ${tP} km</span></div><div style="height:8px;background:var(--s3);border-radius:5px;overflow:hidden;margin-top:12px"><div style="height:100%;width:${Math.min(100,tA/tP*100)}%;background:var(--orange);border-radius:5px"></div></div></div>
+
+  <div class="icard"><h3>Gepland vs. werkelijk per week</h3>
+  <div style="display:flex;align-items:flex-end;gap:4px;height:130px">${wd.map((w,i)=>{const hP=Math.round(w.pKm/mx*100),hA=w.aKm?Math.round(w.aKm/mx*100):0;
+  return`<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px"><div style="font-size:9px;font-weight:700;color:${w.aKm?"var(--text)":"var(--t3)"};font-family:var(--mono)">${w.aKm?w.aKm.toFixed(0):""}</div><div style="width:100%;display:flex;gap:2px;align-items:flex-end;height:${hP}px"><div style="flex:1;height:${hP}px;background:var(--s3);border-radius:3px 3px 0 0"></div><div style="flex:1;height:${hA||1}px;background:${w.aKm?pC[w.pc]:"var(--s2)"};border-radius:3px 3px 0 0"></div></div><div style="font-size:10px;font-weight:${i===wi?800:600};color:${i===wi?"var(--orange)":"var(--t3)"}">W${w.n}</div></div>`;}).join("")}</div>
+  <div class="legend"><span><i style="background:var(--s3)"></i>Gepland</span><span><i style="background:var(--orange)"></i>Werkelijk</span></div></div>
+
+  <div class="icard"><h3>Per sessietype</h3>${[{l:"LT2 Drempel",c:"var(--orange)",p:wd.reduce((a,w)=>a+w.l2P,0),a:wd.reduce((a,w)=>a+w.l2A,0),i:"⚡"},{l:"Lange Duurloop",c:"var(--teal)",p:wd.reduce((a,w)=>a+w.loP,0),a:wd.reduce((a,w)=>a+w.loA,0),i:"🛤️"},{l:"Easy Runs",c:"var(--grey)",p:wd.reduce((a,w)=>a+w.eP,0),a:wd.reduce((a,w)=>a+w.eA,0),i:"🏃"}].map((x,i)=>{const pc=x.p>0?Math.min(100,Math.round(x.a/x.p*100)):0,d=x.a-x.p,dc=!x.a?"var(--t3)":Math.abs(d/x.p*100)<=5?"var(--green)":d>0?"var(--blue)":"var(--red)";
+  return`<div style="margin-bottom:${i<2?18:0}px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><span style="font-size:14px;font-weight:600">${x.i} ${x.l}</span><span style="font-size:14px;font-weight:700;font-family:var(--mono)">${x.a.toFixed(1)} <span style="color:var(--t3);font-weight:500">/ ${x.p.toFixed(1)}</span>${x.a>0?` <span style="font-size:12px;color:${dc}">${d>=0?"+":""}${d.toFixed(1)}</span>`:""}</span></div><div style="height:6px;background:var(--s3);border-radius:4px;overflow:hidden"><div style="height:100%;width:${pc}%;background:${x.c};border-radius:4px"></div></div></div>`;}).join("")}</div>
+
+  <div class="icard"><h3>Hartslag trend</h3><div style="font-size:12px;color:var(--t3);margin-bottom:12px">LT2 = interval-HR · Overig = hele activiteit</div>
+  ${wd.some(w=>w.l2HR||w.aHR)?`<div class="legend" style="margin-top:0;margin-bottom:14px"><span><i style="background:var(--orange)"></i>LT2</span><span><i style="background:var(--blue)"></i>Overig</span></div>
+  <div style="display:flex;align-items:flex-end;gap:4px;height:100px">${wd.map((w,i)=>{const dots=[[w.l2HR,"var(--orange)"],[w.aHR,"var(--blue)"]].filter(d=>d[0]);
+  if(!dots.length)return`<div style="flex:1;position:relative;height:100%"><div style="position:absolute;bottom:-16px;left:50%;transform:translateX(-50%);font-size:10px;color:var(--t3)">W${w.n}</div></div>`;
+  return`<div style="flex:1;position:relative;height:100%">${dots.map(d=>{const p=Math.max(0,Math.min(100,(d[0]-120)/(195-120)*100));return`<div style="position:absolute;bottom:${p}%;left:50%;transform:translate(-50%,50%)"><div style="width:9px;height:9px;border-radius:50%;background:${d[1]}"></div><div style="font-size:8px;font-weight:700;color:var(--t2);font-family:var(--mono);text-align:center;margin-top:1px">${d[0]}</div></div>`;}).join("")}<div style="position:absolute;bottom:-16px;left:50%;transform:translateX(-50%);font-size:10px;font-weight:${i===wi?800:600};color:${i===wi?"var(--orange)":"var(--t3)"}">W${w.n}</div></div>`;}).join("")}</div>
+  <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--t3);margin-top:20px;font-family:var(--mono)"><span>120</span><span>195 bpm</span></div>`:`<div style="font-size:14px;color:var(--t3);padding:20px 0;text-align:center">Log sessies met hartslag om trends te zien</div>`}</div>
+
+  <div class="icard"><h3>Gevoel per week</h3><div style="display:flex;align-items:flex-end;gap:4px;height:70px">${wd.map((w,i)=>{if(!w.feel)return`<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end"><div style="width:100%;height:2px;background:var(--s3);border-radius:2px"></div><div style="font-size:10px;color:var(--t3);margin-top:4px">W${w.n}</div></div>`;const h=Math.round(w.feel/5*55),c=w.feel>=4?"var(--green)":w.feel>=3?"var(--yellow)":w.feel>=2?"var(--orange)":"var(--red)";return`<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px"><div style="font-size:12px">${FE[Math.round(w.feel)-1]}</div><div style="width:100%;height:${h}px;background:${c};border-radius:3px 3px 0 0"></div><div style="font-size:10px;font-weight:${i===wi?800:600};color:${i===wi?"var(--orange)":"var(--t3)"}">W${w.n}</div></div>`;}).join("")}</div></div>
+
+  <div class="icard"><h3>Weekdetail</h3><div style="overflow-x:auto"><table><thead><tr><th>Week</th><th>Plan</th><th>Gelopen</th><th>Δ</th><th style="text-align:center">Gevoel</th></tr></thead><tbody>${wd.map((w,i)=>{const d=w.aKm-w.pKm,dc=!w.aKm?"var(--t3)":Math.abs(d)<=2?"var(--green)":d>0?"var(--blue)":"var(--red)";return`<tr style="background:${i===wi?"var(--s2)":"transparent"}"><td style="font-weight:700;color:${pC[w.pc]}">W${w.n}</td><td style="font-family:var(--mono);color:var(--t2)">${w.pKm}</td><td style="font-family:var(--mono);font-weight:700">${w.aKm>0?w.aKm.toFixed(1):"–"}</td><td style="font-family:var(--mono);font-weight:700;color:${dc}">${w.aKm>0?`${d>=0?"+":""}${d.toFixed(1)}`:"–"}</td><td style="text-align:center">${w.feel?FE[Math.round(w.feel)-1]:"–"}</td></tr>`;}).join("")}</tbody></table></div></div>
+  </div>`;
+}
+
+// ═══ INFO ═══
+function renderInfo(){
+  const syncMsg={ok:"Gesynchroniseerd met Google Drive",saving:"Opslaan...",err:"Sync mislukt",off:"Niet verbonden"};
+  $("app").innerHTML=`<div class="page-hdr"><div style="display:flex;justify-content:space-between;align-items:center"><h1>Profiel & Zones</h1><span style="font-size:13px;color:var(--t2)">${syncDot()}</span></div></div>
+  <div class="section">
+  <div class="icard"><div style="font-size:15px;font-weight:700;margin-bottom:10px">Race</div><div class="info-val">Halve Marathon</div><p class="info-p">31 mei 2026 — Doel: 1:30 – 1:33</p></div>
+  <div class="icard"><div style="font-size:15px;font-weight:700;margin-bottom:10px">LT2 Drempel</div><div class="info-val">178–182 bpm</div><p class="info-p">Referentietempo: ~4:10/km<br>Sturing: hartslag primair, tempo als check<br>Harde bovengrens: 183 bpm → vertraag</p></div>
+  <div class="icard"><div style="font-size:15px;font-weight:700;margin-bottom:10px">Max Hartslag</div><div style="font-size:24px;font-weight:700;margin-bottom:4px">~199 bpm</div><p class="info-p">Gemeten met hartslagband tijdens 10km race</p></div>
+  <div class="icard"><div style="font-size:15px;font-weight:700;margin-bottom:10px">Sessiestructuur</div>
+  <div style="margin-bottom:14px"><div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">⚡ <span style="font-size:15px;font-weight:700;color:var(--orange)">LT2 Drempel</span></div><p class="info-p">Warming-up: 2 km — Cooling down: 1.5 km<br>Herstel tussen reps: 90 sec (~0.25 km)</p></div>
+  <div style="margin-bottom:14px"><div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">🛤️ <span style="font-size:15px;font-weight:700;color:var(--teal)">Lange Duurloop</span></div><p class="info-p">Aerobe basis en vetverbranding, zone 2 bovenkant</p></div>
+  <div><div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">🏃 <span style="font-size:15px;font-weight:700;color:var(--grey)">Easy Run</span></div><p class="info-p">Herstel en basisvolume, zone 1–2</p></div></div>
+  <div class="icard"><div style="font-size:15px;font-weight:700;margin-bottom:10px">Sync & Data</div>
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px"><span class="sync-dot ${syncState}" style="width:12px;height:12px"></span><span style="font-size:14px;color:var(--t2)">${syncMsg[syncState]||""}</span></div>
+  ${syncState==="err"?`<button onclick="saveDrive()" style="padding:12px 18px;background:var(--orangeDim);border:1px solid var(--orange);border-radius:12px;color:var(--orange);font-size:14px;font-weight:600;cursor:pointer;display:block;width:100%;text-align:center;margin-bottom:8px">Opnieuw synchroniseren</button>`:""}
+  <button onclick="exportLog()" style="padding:12px 18px;background:var(--s2);border:1px solid var(--s3);border-radius:12px;color:var(--text);font-size:14px;font-weight:600;cursor:pointer;display:block;width:100%;text-align:center;margin-bottom:8px">Exporteer logboek (JSON)</button>
+  <button onclick="if(confirm('Weet je het zeker?')){log={};save();render();}" style="padding:12px 18px;background:transparent;border:1px solid rgba(255,92,92,.3);border-radius:12px;color:var(--red);font-size:14px;font-weight:600;cursor:pointer;display:block;width:100%;text-align:center;margin-bottom:8px">Wis alle data</button>
+  <button onclick="doLogout()" style="padding:12px 18px;background:transparent;border:1px solid var(--s3);border-radius:12px;color:var(--t3);font-size:14px;font-weight:600;cursor:pointer;display:block;width:100%;text-align:center">Uitloggen</button></div>
+  </div>`;
+}
+function exportLog(){const b=new Blob([JSON.stringify(log,null,2)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="hm-log.json";a.click();}
+
+render();initGoogle();
+</script>
+</body>
+</html>
