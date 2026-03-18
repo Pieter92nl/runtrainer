@@ -23,8 +23,7 @@ function renderPlan() {
   $("app").innerHTML = `
   <div class="hdr">
     <div class="hdr-row">
-      <h1 style="font-size:20px">${plan.name} <span style="color:var(--orange)">${countdownLabel(w.week)}</span></h1>
-      <div class="badge">${plan.targetEvent || ""}${syncDot()}</div>
+      <h1 style="font-size:20px">${plan.name} · <span style="color:var(--orange)">${countdownLabel(w.week)}</span>${syncDot()}</h1>
     </div>
     <div class="pills" id="plan-pills">
       ${plan.weeks.map((wk, i) => {
@@ -46,7 +45,7 @@ function renderPlan() {
     </div>
   </div>
   <div class="cards">${w.sessions.map((s, i) => planCardHTML(plan, w, s, i)).join("")}</div>
-  <div style="height:24px"></div>`;
+  <div style="height:8px"></div>`;
 
   setTimeout(() => { const p = document.querySelector(".pill.on"); if (p) p.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" }); }, 50);
 }
