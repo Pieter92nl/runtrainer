@@ -145,7 +145,18 @@ function migrateOldData() {
 }
 function ensureDefaults() {
   if (!state.sessionTypes.length) state.sessionTypes = JSON.parse(JSON.stringify(DEFAULT_TYPES));
-  if (!state.plans.find(p => p.id === "hm-2026")) state.plans.unshift(JSON.parse(JSON.stringify(DEFAULT_HM_PLAN)));
+  // One-time: replace old hm-2026 plan with new merged-week-0 version
+  const existingHM = state.plans.find(p => p.id === "hm-2026");
+  if (existingHM) {
+    const hasOldStructure = existingHM.weeks.some(w => w.week === 11) || existingHM.weeks.filter(w => w.calWeek === 22).length > 1;
+    if (hasOldStructure) {
+      console.log("Migrating hm-2026 to new structure (merged week 0)");
+      const idx = state.plans.indexOf(existingHM);
+      state.plans[idx] = JSON.parse(JSON.stringify(DEFAULT_HM_PLAN));
+    }
+  } else {
+    state.plans.unshift(JSON.parse(JSON.stringify(DEFAULT_HM_PLAN)));
+  }
   if (!state.activePlanId || !state.plans.find(p => p.id === state.activePlanId)) state.activePlanId = state.plans[0]?.id || null;
 }
 
