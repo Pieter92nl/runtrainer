@@ -1,6 +1,6 @@
 # HM Trainer
 
-Persoonlijke trainingsplanner en logboek voor hardlopen. Gebouwd als lichtgewicht web-app, gehost op GitHub Pages, met Google Drive als opslag.
+Persoonlijke trainingsplanner en logboek voor hardlopen. Gebouwd als lichtgewicht web-app, gehost op GitHub Pages, met Google Drive als opslag. Ontworpen met ChatGPT & Claude Opus 4.6
 
 ## Wat het doet
 
