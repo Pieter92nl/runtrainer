@@ -16,6 +16,7 @@ function renderBuilder() {
             ${isActive ? `<span style="font-size:11px;font-weight:600;color:var(--green);background:var(--greenDim);padding:3px 8px;border-radius:6px">Actief</span>` : ""}
           </div>
           <div style="font-size:13px;color:var(--t2)">${p.weeks.length} weken · ${totalKm.toFixed(0)} km · ${p.targetEvent || "Geen doel"}</div>
+          ${p.lt2PaceAtCreation ? `<div style="font-size:11px;color:var(--t3);margin-top:4px">Bevroren: LT2 ${p.lt2PaceAtCreation}/km · VO2max ${p.vo2maxPaceAtCreation || "–"}/km</div>` : ""}
         </div>`;
       }).join("")}
     </div>`;
@@ -39,6 +40,7 @@ function renderBuilder() {
         <div class="field" style="margin-bottom:0"><label>Naam</label><input type="text" value="${plan.name}" onchange="updatePlanMeta('${plan.id}','name',this.value)" style="padding:10px 12px;font-size:14px"></div>
         <div class="field" style="margin-bottom:0"><label>Doeldatum</label><input type="date" value="${plan.targetDate||""}" onchange="updatePlanMeta('${plan.id}','targetDate',this.value)" style="padding:10px 12px;font-size:14px"></div>
       </div>
+      ${plan.lt2PaceAtCreation ? `<div style="font-size:11px;color:var(--t3);margin-top:10px">Bevroren tempo: LT2 ${plan.lt2PaceAtCreation}/km · VO2max ${plan.vo2maxPaceAtCreation || "–"}/km</div>` : ""}
     </div>
 
     <div class="pills" style="margin-bottom:12px">
@@ -66,15 +68,22 @@ function renderBuilder() {
       <div style="margin-bottom:12px"><label style="display:block;font-size:12px;font-weight:700;color:var(--t2);margin-bottom:8px;text-transform:uppercase;letter-spacing:.06em">Sessies</label>
         ${w.sessions.map((s,si) => {
           const type = getType(s.typeId);
+          const isInt = isIntervalType(s.typeId);
+          const workLabel = s.typeId === "vo2max" ? "VO2max" : "LT2";
           return `<div style="padding:10px;background:var(--s2);border-radius:10px;margin-bottom:6px">
             <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
               <span style="font-size:16px">${type.icon}</span>
               <span style="font-size:14px;font-weight:600;flex:1">${type.name}</span>
-              <input type="number" step="0.1" value="${s.plannedKm}" onchange="updateSessionKm('${plan.id}',${builderWeekIdx},${si},this.value)" style="width:60px;padding:6px 8px;font-size:13px;background:var(--s3);border:1px solid var(--s3);border-radius:8px;color:var(--text);text-align:center;font-family:var(--mono)" inputmode="decimal">
+              <input type="number" step="0.1" value="${s.plannedKm}" onchange="updateSessionField('${plan.id}',${builderWeekIdx},${si},'plannedKm',parseFloat(this.value)||0)" style="width:60px;padding:6px 8px;font-size:13px;background:var(--s3);border:1px solid var(--s3);border-radius:8px;color:var(--text);text-align:center;font-family:var(--mono)" inputmode="decimal">
               <span style="font-size:12px;color:var(--t3)">km</span>
               <button onclick="removeSession('${plan.id}',${builderWeekIdx},${si})" style="background:none;border:none;color:var(--red);font-size:16px;cursor:pointer;padding:4px">×</button>
             </div>
-            <input type="text" value="${s.desc||""}" onchange="updateSessionDesc('${plan.id}',${builderWeekIdx},${si},this.value)" placeholder="Beschrijving (bijv. 3×11 min @ LT2)" style="width:100%;padding:8px 10px;font-size:12px;background:var(--s3);border:1px solid rgba(255,255,255,.04);border-radius:8px;color:var(--t2)">
+            ${isInt ? `<div style="display:flex;gap:8px;margin-bottom:6px;align-items:center">
+              <input type="number" value="${s.plannedMinutes||""}" onchange="updatePlannedMinutes('${plan.id}',${builderWeekIdx},${si},parseInt(this.value)||0)" placeholder="Min" style="width:60px;padding:6px 8px;font-size:13px;background:var(--s3);border:1px solid var(--s3);border-radius:8px;color:var(--text);text-align:center;font-family:var(--mono)" inputmode="numeric">
+              <span style="font-size:12px;color:var(--t3)">min op intensiteit</span>
+              ${s.workKm ? `<span style="font-size:12px;color:${type.color};margin-left:auto">${workLabel}: ${s.workKm} km</span>` : ""}
+            </div>` : ""}
+            <input type="text" value="${s.desc||""}" onchange="updateSessionField('${plan.id}',${builderWeekIdx},${si},'desc',this.value)" placeholder="Beschrijving (optioneel)" style="width:100%;padding:8px 10px;font-size:12px;background:var(--s3);border:1px solid rgba(255,255,255,.04);border-radius:8px;color:var(--t2)">
           </div>`;
         }).join("")}
         <button onclick="openAddSession('${plan.id}',${builderWeekIdx})" style="width:100%;padding:10px;background:var(--s2);border:1px dashed var(--s3);border-radius:10px;color:var(--t2);font-size:13px;font-weight:600;cursor:pointer;margin-top:4px">+ Sessie toevoegen</button>
@@ -93,10 +102,19 @@ function renderBuilder() {
 // ═══════════ PLAN ACTIONS ═══════════
 function createNewPlan() {
   const cw = getCurrentCalWeek(), year = new Date().getFullYear();
-  const p = { id:"plan-"+Date.now(), name:"Nieuw plan", targetDate:"", targetEvent:"", createdAt:Date.now(),
-    weeks:[{week:0,calWeek:cw,year,dates:"",phase:"Opbouw",phaseColor:"blue",sessions:[]}] };
+  const lt2Pace = state.settings.profile.lt2Pace || "4:10";
+  const vo2Offset = state.settings.profile.vo2maxOffset || 15;
+  const lt2Secs = parsePaceToSeconds(lt2Pace);
+  const vo2Pace = lt2Secs ? secondsToPace(lt2Secs - vo2Offset) : "3:55";
+
+  const p = {
+    id: "plan-" + Date.now(), name: "Nieuw plan", targetDate: "", targetEvent: "", createdAt: Date.now(),
+    lt2PaceAtCreation: lt2Pace, vo2maxOffsetAtCreation: vo2Offset, vo2maxPaceAtCreation: vo2Pace,
+    weeks: [{ week: 0, calWeek: cw, year, dates: "", phase: "Opbouw", phaseColor: "blue", sessions: [] }]
+  };
   state.plans.push(p); builderPlanId = p.id; builderWeekIdx = 0; save(); render();
 }
+
 function openBuilderPlan(id) { builderPlanId = id; builderWeekIdx = 0; render(); }
 function setActivePlan(id) { state.activePlanId = id; save(); render(); }
 
@@ -104,7 +122,7 @@ function updatePlanMeta(id, key, val) {
   const plan = state.plans.find(p => p.id === id); if (!plan) return;
   plan[key] = val;
   if (key === "targetDate" && val) {
-    plan.targetEvent = plan.name + " — " + new Date(val).toLocaleDateString("nl-NL",{day:"numeric",month:"long",year:"numeric"});
+    plan.targetEvent = plan.name + " — " + new Date(val).toLocaleDateString("nl-NL", { day: "numeric", month: "long", year: "numeric" });
     recalcCountdown(plan);
   }
   save(); render();
@@ -113,21 +131,18 @@ function updatePlanMeta(id, key, val) {
 function recalcCountdown(plan) {
   if (!plan.targetDate) return;
   const target = new Date(plan.targetDate), targetCW = getCalWeekOfDate(target), targetYear = target.getFullYear();
-  plan.weeks.forEach(w => { w.week = Math.max(0, (targetYear*52+targetCW) - (w.year*52+w.calWeek)); });
-  plan.weeks.sort((a,b) => b.week - a.week);
+  plan.weeks.forEach(w => { w.week = Math.max(0, (targetYear * 52 + targetCW) - (w.year * 52 + w.calWeek)); });
+  plan.weeks.sort((a, b) => b.week - a.week);
 }
-function getCalWeekOfDate(date) {
-  const jan1 = new Date(date.getFullYear(),0,1);
-  return Math.ceil(((date - jan1)/86400000 + jan1.getDay() + 1) / 7);
-}
+function getCalWeekOfDate(date) { const jan1 = new Date(date.getFullYear(), 0, 1); return Math.ceil(((date - jan1) / 86400000 + jan1.getDay() + 1) / 7); }
 
 function addWeekToPlan(id) {
   const plan = state.plans.find(p => p.id === id); if (!plan) return;
-  const last = plan.weeks[plan.weeks.length-1];
-  const newCW = last ? (last.calWeek%52)+1 : getCurrentCalWeek();
-  const newYear = last ? (last.calWeek>=52 ? last.year+1 : last.year) : new Date().getFullYear();
-  plan.weeks.push({week:0,calWeek:newCW,year:newYear,dates:"",phase:"Opbouw",phaseColor:"blue",sessions:[]});
-  recalcCountdown(plan); builderWeekIdx = plan.weeks.length-1; save(); render();
+  const last = plan.weeks[plan.weeks.length - 1];
+  const newCW = last ? (last.calWeek % 52) + 1 : getCurrentCalWeek();
+  const newYear = last ? (last.calWeek >= 52 ? last.year + 1 : last.year) : new Date().getFullYear();
+  plan.weeks.push({ week: 0, calWeek: newCW, year: newYear, dates: "", phase: "Opbouw", phaseColor: "blue", sessions: [] });
+  recalcCountdown(plan); builderWeekIdx = plan.weeks.length - 1; save(); render();
 }
 
 function setWeekPhase(id, wi, phase) {
@@ -135,14 +150,21 @@ function setWeekPhase(id, wi, phase) {
   plan.weeks[wi].phase = phase; plan.weeks[wi].phaseColor = PHASE_COLOR_MAP[phase] || "grey"; save(); render();
 }
 
-function updateSessionKm(id, wi, si, val) {
+function updateSessionField(id, wi, si, field, val) {
   const plan = state.plans.find(p => p.id === id); if (!plan) return;
-  plan.weeks[wi].sessions[si].plannedKm = parseFloat(val) || 0; save();
+  plan.weeks[wi].sessions[si][field] = val; save();
 }
 
-function updateSessionDesc(id, wi, si, val) {
+function updatePlannedMinutes(id, wi, si, minutes) {
   const plan = state.plans.find(p => p.id === id); if (!plan) return;
-  plan.weeks[wi].sessions[si].desc = val; save();
+  const sess = plan.weeks[wi].sessions[si];
+  sess.plannedMinutes = minutes;
+  // Auto-calculate workKm based on frozen pace
+  const paceSecs = getPaceForType(plan, sess.typeId);
+  if (paceSecs && minutes > 0) {
+    sess.workKm = calcWorkKm(minutes, paceSecs);
+  }
+  save(); render();
 }
 
 function removeSession(id, wi, si) {
@@ -153,15 +175,15 @@ function removeSession(id, wi, si) {
 function copyWeek(id, wi) {
   const plan = state.plans.find(p => p.id === id); if (!plan) return;
   const src = plan.weeks[wi];
-  const copy = {...JSON.parse(JSON.stringify(src)), calWeek:(src.calWeek%52)+1, year:src.calWeek>=52?src.year+1:src.year, week:0};
-  plan.weeks.splice(wi+1, 0, copy); recalcCountdown(plan); builderWeekIdx = wi+1; save(); render();
+  const copy = { ...JSON.parse(JSON.stringify(src)), calWeek: (src.calWeek % 52) + 1, year: src.calWeek >= 52 ? src.year + 1 : src.year, week: 0 };
+  plan.weeks.splice(wi + 1, 0, copy); recalcCountdown(plan); builderWeekIdx = wi + 1; save(); render();
 }
 
 function deleteWeek(id, wi) {
   const plan = state.plans.find(p => p.id === id); if (!plan || plan.weeks.length <= 1) return;
   if (!confirm("Week verwijderen?")) return;
   plan.weeks.splice(wi, 1); recalcCountdown(plan);
-  if (builderWeekIdx >= plan.weeks.length) builderWeekIdx = plan.weeks.length-1; save(); render();
+  if (builderWeekIdx >= plan.weeks.length) builderWeekIdx = plan.weeks.length - 1; save(); render();
 }
 
 function deletePlan(id) {
@@ -176,7 +198,7 @@ function openAddSession(id, wi) {
   <div style="display:flex;flex-direction:column;gap:8px">${state.sessionTypes.map(t => `
     <button onclick="addSessionToPlan('${id}',${wi},'${t.id}')" style="display:flex;align-items:center;gap:12px;padding:14px;background:var(--s2);border:1px solid var(--s3);border-radius:12px;cursor:pointer;width:100%;text-align:left">
       <span style="font-size:20px">${t.icon}</span>
-      <div style="flex:1"><div style="font-size:15px;font-weight:600;color:var(--text)">${t.name}</div><div style="font-size:12px;color:var(--t3)">${t.hint||""}</div></div>
+      <div style="flex:1"><div style="font-size:15px;font-weight:600;color:var(--text)">${t.name}</div></div>
       <div style="width:12px;height:12px;border-radius:50%;background:${t.color}"></div>
     </button>`).join("")}</div>`;
   $("ov").classList.add("open"); $("sh").classList.add("open");
@@ -184,6 +206,8 @@ function openAddSession(id, wi) {
 
 function addSessionToPlan(id, wi, typeId) {
   const plan = state.plans.find(p => p.id === id); if (!plan) return;
-  plan.weeks[wi].sessions.push({typeId, desc:"", plannedKm:10, zone:""});
+  const sess = { typeId, desc: "", plannedKm: 10 };
+  if (isIntervalType(typeId)) { sess.plannedMinutes = 0; sess.workKm = 0; }
+  plan.weeks[wi].sessions.push(sess);
   closeSheet(); save(); render();
 }
