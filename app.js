@@ -30,7 +30,14 @@ function getType(typeId) {
 function getActivePlan() { return state.plans.find(p => p.id === state.activePlanId) || state.plans[0] || null; }
 function weekPlannedKm(plan, w) { return w.sessions.reduce((s, sess) => s + (sess.plannedKm || 0), 0); }
 function weekLoggedKm(plan, w) { return w.sessions.reduce((s, _, i) => { const l = getLog(plan.id, w.week, i); return s + (l ? l.km : 0); }, 0); }
-function getCurrentCalWeek() { const now = new Date(), jan1 = new Date(now.getFullYear(), 0, 1); return Math.ceil(((now - jan1) / 86400000 + jan1.getDay() + 1) / 7); }
+function getCurrentCalWeek() {
+  const now = new Date();
+  const d = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
+  const dayNum = d.getUTCDay() || 7; // Sunday=7 instead of 0
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum); // Set to nearest Thursday
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+}
 function getAutoWeekIdx(plan) { const cw = getCurrentCalWeek(), cy = new Date().getFullYear(); for (let i = 0; i < plan.weeks.length; i++) { if (plan.weeks[i].calWeek === cw && plan.weeks[i].year === cy) return i; } return 0; }
 function syncDot() { return `<span class="sync-dot ${syncState}"></span>`; }
 
@@ -46,15 +53,32 @@ function initGoogle() {
   if (typeof google === "undefined" || !google.accounts) { setTimeout(initGoogle, 200); return; }
   tokenClient = google.accounts.oauth2.initTokenClient({ client_id: CLIENT_ID, scope: SCOPES, callback: onToken, error_callback: () => { syncState = "err"; render(); } });
   const st = localStorage.getItem("hm-gtoken");
-  if (st) { try { const t = JSON.parse(st); if (t.exp > Date.now()) { token = t.tk; syncState = "ok"; loadDrive(); } } catch (e) {} }
+  if (st) { try { const t = JSON.parse(st); if (t.exp > Date.now()) { token = t.tk; syncState = "ok"; scheduleTokenRefresh(t.exp - Date.now()); loadDrive(); } } catch (e) {} }
   render();
 }
 function onToken(r) {
   if (r.error) { syncState = "err"; render(); return; }
   token = r.access_token;
-  localStorage.setItem("hm-gtoken", JSON.stringify({ tk: token, exp: Date.now() + (r.expires_in * 1000) - 60000 }));
-  syncState = "ok"; $("nav").style.display = "flex"; loadDrive();
+  const expiresIn = r.expires_in * 1000;
+  localStorage.setItem("hm-gtoken", JSON.stringify({ tk: token, exp: Date.now() + expiresIn - 60000 }));
+  syncState = "ok"; $("nav").style.display = "flex";
+  scheduleTokenRefresh(expiresIn);
+  loadDrive();
 }
+
+let refreshTimer = null;
+function scheduleTokenRefresh(expiresInMs) {
+  if (refreshTimer) clearTimeout(refreshTimer);
+  // Refresh 5 minutes before expiry
+  const refreshIn = Math.max(expiresInMs - 300000, 60000);
+  refreshTimer = setTimeout(() => {
+    console.log("Silent token refresh...");
+    if (tokenClient) {
+      tokenClient.requestAccessToken({ prompt: "" });
+    }
+  }, refreshIn);
+}
+
 function doLogin() { if (tokenClient) tokenClient.requestAccessToken({ prompt: "consent" }); }
 function doLogout() { token = null; fileId = null; syncState = "off"; localStorage.removeItem("hm-gtoken"); $("nav").style.display = "none"; render(); }
 

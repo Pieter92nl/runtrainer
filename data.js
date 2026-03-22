@@ -6,7 +6,7 @@ const DEFAULT_TYPES = [
     hrLabel:"HR intervallen", paceLabel:"Pace intervallen", pacePlaceholder:"4:10",
     kmLabel:"Totale afstand incl. w-up/c-down",
     hint:"Vul tempo en hartslag van de LT2-intervallen in, niet van de hele activiteit" },
-  { id:"long", name:"Lange Duurloop", icon:"🛤️", color:"#2DD4BF", colorDim:"rgba(45,212,191,.10)",
+  { id:"long", name:"Lange Duurloop", icon:"🕐", color:"#2DD4BF", colorDim:"rgba(45,212,191,.10)",
     isInterval:false,
     fields:["km","hr","pace","feel","terrain","notes"],
     hrLabel:"Gem. HR", paceLabel:"Gem. Pace", pacePlaceholder:"5:30",
@@ -132,9 +132,17 @@ function countdownShort(weekNum) { return weekNum===0 ? "0" : `-${weekNum}`; }
 // ═══════════ MONTH / TIMELINE HELPERS ═══════════
 const MONTH_LABELS = ["jan","feb","mrt","apr","mei","jun","jul","aug","sep","okt","nov","dec"];
 function getMonthOfCalWeek(calWeek, year) {
-  const jan1 = new Date(year, 0, 1);
-  const dayOffset = (calWeek - 1) * 7 - jan1.getDay() + 1;
-  return new Date(year, 0, dayOffset + 3).getMonth();
+  // ISO 8601: week 1 contains the year's first Thursday
+  const jan4 = new Date(year, 0, 4);
+  const dayOfWeek = jan4.getDay() || 7;
+  const mondayW1 = new Date(jan4);
+  mondayW1.setDate(jan4.getDate() - dayOfWeek + 1);
+  const targetMonday = new Date(mondayW1);
+  targetMonday.setDate(mondayW1.getDate() + (calWeek - 1) * 7);
+  // Use Thursday of that week to determine the month
+  const thursday = new Date(targetMonday);
+  thursday.setDate(targetMonday.getDate() + 3);
+  return thursday.getMonth();
 }
 
 // ═══════════ PACE MATH ═══════════

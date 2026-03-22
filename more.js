@@ -53,7 +53,6 @@ function renderProfile() {
       <div class="field"><label>VO2max Offset (sec sneller dan LT2)</label><input type="number" id="pe-vo2offset" value="${p.vo2maxOffset || 15}" placeholder="15" inputmode="numeric"></div>
       <div style="font-size:12px;color:var(--t3);margin:-12px 0 20px">VO2max tempo wordt: ${computedVo2}/km</div>
       <div class="field"><label>Max Hartslag</label><input type="text" id="pe-maxhr" value="${p.maxHR}" placeholder="~199 bpm"></div>
-      <div class="field"><label>Doeltijd</label><input type="text" id="pe-target" value="${p.target}" placeholder="1:30 – 1:33"></div>
       <button class="btn-save" onclick="saveProfile()">Opslaan</button>
       <button class="btn-del" onclick="profileEditing=false;render()">Annuleren</button>
     </div>`;
@@ -71,7 +70,6 @@ function renderProfile() {
       <div><div style="font-size:11px;color:var(--t3);margin-bottom:2px">VO2max Tempo</div><div style="font-size:18px;font-weight:700;color:var(--red)">${computedVo2}/km</div></div>
       <div><div style="font-size:11px;color:var(--t3);margin-bottom:2px">VO2max Offset</div><div style="font-size:18px;font-weight:700">-${p.vo2maxOffset || 15}s</div></div>
       <div><div style="font-size:11px;color:var(--t3);margin-bottom:2px">Max Hartslag</div><div style="font-size:18px;font-weight:700">${p.maxHR}</div></div>
-      <div><div style="font-size:11px;color:var(--t3);margin-bottom:2px">Doeltijd</div><div style="font-size:18px;font-weight:700">${p.target}</div></div>
     </div>
   </div>
 
@@ -101,8 +99,7 @@ function saveProfile() {
     lt2HR: $("pe-lt2hr").value.trim() || state.settings.profile.lt2HR,
     lt2Pace: $("pe-lt2pace").value.trim() || state.settings.profile.lt2Pace,
     vo2maxOffset: parseInt($("pe-vo2offset").value) || 15,
-    maxHR: $("pe-maxhr").value.trim() || state.settings.profile.maxHR,
-    target: $("pe-target").value.trim() || state.settings.profile.target
+    maxHR: $("pe-maxhr").value.trim() || state.settings.profile.maxHR
   };
   profileEditing = false; save(); render();
 }
