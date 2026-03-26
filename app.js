@@ -83,9 +83,33 @@ function doLogin() { if (tokenClient) tokenClient.requestAccessToken({ prompt: "
 function doLogout() { token = null; fileId = null; syncState = "off"; localStorage.removeItem("hm-gtoken"); $("nav").style.display = "none"; render(); }
 
 // ═══════════ GOOGLE DRIVE ═══════════
+let _reauthing = false;
+async function handleAuth401() {
+  if (_reauthing) return false;
+  _reauthing = true;
+  console.log("Token expired, attempting silent refresh...");
+  try {
+    await new Promise((resolve, reject) => {
+      const origCallback = tokenClient.callback;
+      tokenClient.callback = (r) => { origCallback(r); if (r.error) reject(r.error); else resolve(); };
+      tokenClient.requestAccessToken({ prompt: "" });
+      // Fallback timeout — if silent fails after 3s, prompt user
+      setTimeout(() => reject("timeout"), 3000);
+    });
+    _reauthing = false;
+    return true;
+  } catch (e) {
+    console.warn("Silent refresh failed, requesting consent...", e);
+    _reauthing = false;
+    // Fall back to interactive login
+    tokenClient.requestAccessToken({ prompt: "consent" });
+    return false;
+  }
+}
+
 async function findFile() {
   try { const r = await fetch(`${DAPI}/files?spaces=appDataFolder&q=name='${FNAME}'&fields=files(id)`, { headers: { "Authorization": "Bearer " + token } });
-  if (!r.ok) { if (r.status === 401) { token = null; syncState = "off"; render(); } return null; }
+  if (!r.ok) { if (r.status === 401) { const refreshed = await handleAuth401(); if (refreshed) return findFile(); return null; } return null; }
   const d = await r.json(); return d.files?.length ? d.files[0].id : null; } catch (e) { return null; }
 }
 async function loadDrive() {
@@ -137,6 +161,14 @@ function migrateOldData() {
 
 function ensureDefaults() {
   if (!state.sessionTypes.length) state.sessionTypes = JSON.parse(JSON.stringify(DEFAULT_TYPES));
+  // Sync icons/colors from defaults to stored types (one-way merge)
+  DEFAULT_TYPES.forEach(dt => {
+    const existing = state.sessionTypes.find(t => t.id === dt.id);
+    if (existing) {
+      existing.icon = dt.icon;
+      existing.isInterval = dt.isInterval;
+    }
+  });
   // Ensure vo2maxOffset exists in profile
   if (!state.settings.profile.vo2maxOffset) state.settings.profile.vo2maxOffset = 15;
   // Force-replace old hm-2026 plan structure
