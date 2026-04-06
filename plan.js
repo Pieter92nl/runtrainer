@@ -9,14 +9,14 @@ function renderPlan() {
   const w = plan.weeks[planWeekIdx];
   if (!w) { planWeekIdx = 0; return renderPlan(); }
   const pKm = weekPlannedKm(plan, w), aKm = weekLoggedKm(plan, w);
-  const pct = pKm > 0 ? Math.min(100, Math.round(aKm / pKm * 100)) : 0;
+  const pct = pKm > 0 ? Math.round(aKm / pKm * 100) : 0;
   const pc = PHASE_COLORS[w.phaseColor] || PHASE_COLORS.grey;
 
   $("app").innerHTML = `
   <div class="hdr"><div class="hdr-row"><h1 style="font-size:20px">${plan.name} · <span style="color:var(--orange)">${countdownLabel(w.week)}</span>${syncDot()}</h1></div>
   <div class="pills">${plan.weeks.map((wk, i) => { const done = wk.sessions.every((_, si) => getLog(plan.id, wk.week, si)); return `<button class="pill ${i===planWeekIdx?"on":""} ${done?"done":""}" onclick="planWeekIdx=${i};renderPlan()">${countdownPill(wk.week)}</button>`; }).join("")}</div></div>
   <div class="phase"><div class="dot" style="background:${pc.c}"></div><span class="lbl" style="color:${pc.c}">${w.phase}</span><span class="dt">${w.dates}${w.calWeek?` · W${w.calWeek}`:""}</span></div>
-  <div class="vol"><div class="num">${pKm}<span>km</span></div><div class="bar-w"><div class="bar"><div style="width:${pct}%;background:${pct>=100?"var(--green)":"var(--orange)"}"></div></div><span class="pct" style="color:${pct>=100?"var(--green)":"var(--t2)"}">${pct}%</span></div></div>
+  <div class="vol"><div class="num">${pKm}<span>km</span></div><div class="bar-w"><div class="bar"><div style="width:${Math.min(pct,100)}%;background:${pct>=100?"var(--green)":"var(--orange)"}"></div></div><span class="pct" style="color:${pct>=100?"var(--green)":"var(--t2)"}">${pct}%</span></div></div>
   <div class="cards">${w.sessions.map((s, i) => planCardHTML(plan, w, s, i)).join("")}</div>
   <div style="height:8px"></div>`;
   setTimeout(() => { const p = document.querySelector(".pill.on"); if (p) p.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" }); }, 50);

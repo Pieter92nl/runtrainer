@@ -52,9 +52,17 @@ function insightsPlan(plan) {
 
   const tP = wd.reduce((a,w) => a+w.pKm, 0), tA = wd.reduce((a,w) => a+w.aKm, 0), tS = wd.reduce((a,w) => a+w.sL, 0);
   const mx = Math.max(...wd.map(w => Math.max(w.pKm, w.aKm)), 1);
-  const diffPct = tP > 0 ? ((tA-tP)/tP*100).toFixed(0) : 0;
-  const diffColor = Math.abs(diffPct) <= 5 ? "var(--green)" : diffPct > 0 ? "var(--blue)" : "var(--red)";
-  const diffLabel = diffPct > 0 ? `${diffPct}% boven schema` : diffPct < 0 ? `${Math.abs(diffPct)}% onder schema` : "Op schema";
+
+  // Compliance: only count planned km of sessions that have been logged
+  let compPlanned = 0, compActual = 0;
+  plan.weeks.forEach(w => w.sessions.forEach((s, si) => {
+    const l = getLog(plan.id, w.week, si);
+    if (l) { compPlanned += s.plannedKm || 0; compActual += l.km || 0; }
+  }));
+  const compPct = compPlanned > 0 ? Math.round((compActual - compPlanned) / compPlanned * 100) : 0;
+  const compColor = Math.abs(compPct) <= 5 ? "var(--green)" : compPct > 0 ? "var(--blue)" : "var(--red)";
+  const compLabel = compPct > 0 ? `${compPct}% boven schema` : compPct < 0 ? `${Math.abs(compPct)}% onder schema` : "Op schema";
+  const compBarPct = compPlanned > 0 ? Math.min(100, Math.round(compActual / compPlanned * 100)) : 0;
 
   // Per session type km
   const typeTotals = {};
@@ -68,19 +76,19 @@ function insightsPlan(plan) {
 
   return `
   <div class="icard"><h3>Compliance — ${plan.name}</h3>
-    <div class="big">${tA.toFixed(1)} <span>/ ${tP} km</span></div>
+    <div class="big">${Math.round(tA)} <span>/ ${Math.round(tP)} km</span></div>
     <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
-      <span style="font-size:14px;font-weight:700;color:${diffColor}">${diffLabel}</span>
+      <span style="font-size:14px;font-weight:700;color:${compColor}">${tS > 0 ? compLabel : "Nog geen sessies gelogd"}</span>
       <span style="font-size:12px;color:var(--t3)">${tS} sessies gelogd</span>
     </div>
-    <div style="height:8px;background:var(--s3);border-radius:5px;overflow:hidden;margin-top:12px"><div style="height:100%;width:${Math.min(100,tA/tP*100)}%;background:var(--orange);border-radius:5px"></div></div>
+    <div style="height:8px;background:var(--s3);border-radius:5px;overflow:hidden;margin-top:12px"><div style="height:100%;width:${compBarPct}%;background:var(--orange);border-radius:5px"></div></div>
   </div>
 
   <div class="icard"><h3>Gepland vs. werkelijk</h3>
     <div style="display:flex;align-items:flex-end;gap:4px;height:130px">${wd.map((w,i) => {
       const hP = Math.round(w.pKm/mx*100), hA = w.aKm ? Math.round(w.aKm/mx*100) : 0;
       const pc = PHASE_COLORS[w.pc] || PHASE_COLORS.grey;
-      return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px"><div style="font-size:9px;font-weight:700;color:${w.aKm?"var(--text)":"var(--t3)"};font-family:var(--mono)">${w.aKm?w.aKm.toFixed(0):""}</div><div style="width:100%;display:flex;gap:2px;align-items:flex-end;height:${hP}px"><div style="flex:1;height:${hP}px;background:var(--s3);border-radius:3px 3px 0 0"></div><div style="flex:1;height:${hA||1}px;background:${w.aKm?pc.c:"var(--s2)"};border-radius:3px 3px 0 0"></div></div><div style="font-size:10px;font-weight:${i===planWeekIdx?800:600};color:${i===planWeekIdx?"var(--orange)":"var(--t3)"}">${countdownShort(w.w)}</div></div>`;
+      return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px"><div style="font-size:9px;font-weight:700;color:${w.aKm?"var(--text)":"var(--t3)"};font-family:var(--mono);position:relative;z-index:1">${w.aKm?w.aKm.toFixed(0):""}</div><div style="width:100%;display:flex;gap:2px;align-items:flex-end;height:${hP}px"><div style="flex:1;height:${hP}px;background:var(--s3);border-radius:3px 3px 0 0"></div><div style="flex:1;height:${hA||1}px;background:${w.aKm?pc.c:"var(--s2)"};border-radius:3px 3px 0 0"></div></div><div style="font-size:10px;font-weight:${i===planWeekIdx?800:600};color:${i===planWeekIdx?"var(--orange)":"var(--t3)"}">${countdownShort(w.w)}</div></div>`;
     }).join("")}</div>
     <div class="legend"><span><i style="background:var(--s3)"></i>Gepland</span><span><i style="background:${(PHASE_COLORS[wd[0]?.pc]||PHASE_COLORS.grey).c}"></i>Werkelijk</span></div>
   </div>
