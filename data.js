@@ -166,8 +166,10 @@ function calcWorkKm(plannedMinutes, paceSeconds) {
 }
 
 function isIntervalType(typeId) {
-  const t = DEFAULT_TYPES.find(dt => dt.id === typeId);
-  return t ? t.isInterval : false;
+  const st = state?.sessionTypes?.find(t => t.id === typeId);
+  if (st && st.isInterval !== undefined) return st.isInterval;
+  const dt = DEFAULT_TYPES.find(t => t.id === typeId);
+  return dt ? dt.isInterval : false;
 }
 
 function getPaceForType(plan, typeId) {

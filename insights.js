@@ -24,7 +24,7 @@ function insightsPlan(plan) {
 
   const wd = plan.weeks.map(w => {
     const pKm = weekPlannedKm(plan, w), aKm = weekLoggedKm(plan, w);
-    let feels = [], actHR = [], intPaces = [], actPaces = [];
+    let feels = [], actHR = [], lt2Paces = [], vo2Paces = [], actPaces = [];
     let intPlannedMin = 0, intActualMin = 0;
 
     w.sessions.forEach((s, si) => {
@@ -32,8 +32,11 @@ function insightsPlan(plan) {
       const isInt = isIntervalType(s.typeId);
       if (l) {
         feels.push(l.feel);
-        if (isInt) {
-          const p = parsePaceToSeconds(l.pace); if (p) intPaces.push(p);
+        if (s.typeId === "lt2") {
+          const p = parsePaceToSeconds(l.pace); if (p) lt2Paces.push(p);
+          if (l.actualMinutes) intActualMin += l.actualMinutes;
+        } else if (s.typeId === "vo2max") {
+          const p = parsePaceToSeconds(l.pace); if (p) vo2Paces.push(p);
           if (l.actualMinutes) intActualMin += l.actualMinutes;
         } else {
           if (l.hr > 0) actHR.push(l.hr);
@@ -46,7 +49,7 @@ function insightsPlan(plan) {
     const av = a => a.length ? a.reduce((x,y) => x+y, 0)/a.length : null;
     return { w:w.week, pc:w.phaseColor, pKm, aKm, feel:av(feels),
       actHR: actHR.length ? Math.round(av(actHR)) : null,
-      intPace: av(intPaces), actPace: av(actPaces),
+      lt2Pace: av(lt2Paces), vo2Pace: av(vo2Paces), actPace: av(actPaces),
       intPlannedMin, intActualMin, sL: feels.length };
   });
 
@@ -69,7 +72,7 @@ function insightsPlan(plan) {
   plan.weeks.forEach(w => w.sessions.forEach((s,si) => {
     if (!typeTotals[s.typeId]) typeTotals[s.typeId] = {p:0,a:0,pMin:0,aMin:0};
     typeTotals[s.typeId].p += s.plannedKm || 0;
-    if (isIntervalType(s.typeId) && s.plannedMinutes) typeTotals[s.typeId].pMin += s.plannedMinutes;
+    if (isIntervalType(s.typeId) && s.plannedMinutes) typeTotals[s.typeId].pMin += s.plannedMinutes * 60; // store as seconds
     const l = getLog(plan.id, w.week, si);
     if (l) { typeTotals[s.typeId].a += l.km || 0; if (l.actualMinutes) typeTotals[s.typeId].aMin += l.actualMinutes; }
   }));
@@ -99,19 +102,19 @@ function insightsPlan(plan) {
     const isInt = isIntervalType(tid);
     return `<div style="margin-bottom:14px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px"><span style="font-size:14px;font-weight:600">${tp.icon} ${tp.name}</span><span style="font-size:13px;font-family:var(--mono);font-weight:700">${v.a.toFixed(1)} <span style="color:var(--t3);font-weight:500">/ ${v.p.toFixed(1)}</span>${v.a>0?` <span style="font-size:11px;color:${dc}">${d>=0?"+":""}${d.toFixed(1)}</span>`:""}</span></div>
     <div style="height:5px;background:var(--s3);border-radius:3px;overflow:hidden"><div style="height:100%;width:${pc}%;background:${tp.color};border-radius:3px"></div></div>
-    ${isInt && v.pMin > 0 ? `<div style="font-size:12px;color:var(--t3);margin-top:4px">Minuten: ${v.aMin || 0} <span style="color:var(--t3)">/ ${v.pMin} gepland</span></div>` : ""}
+    ${isInt && v.pMin > 0 ? `<div style="font-size:12px;color:var(--t3);margin-top:4px">Minuten: ${fmtMinSec(v.aMin || 0)} <span style="color:var(--t3)">/ ${fmtMinSec(v.pMin)} gepland</span></div>` : ""}
     </div>`;
   }).join("")}</div>
 
-  <div class="icard"><h3>Pace trend — intervallen vs. overig</h3>
-    <div style="font-size:12px;color:var(--t3);margin-bottom:12px">Intervallen = LT2/VO2max tempo · Overig = hele activiteit</div>
-    ${wd.some(w=>w.intPace||w.actPace)?`
-    <div class="legend" style="margin-top:0;margin-bottom:14px"><span><i style="background:var(--orange)"></i>Intervallen</span><span><i style="background:var(--blue)"></i>Overig</span></div>
-    <div style="display:flex;align-items:flex-end;gap:4px;height:100px">${wd.map((w,i) => {
-      const dots=[[w.intPace,"var(--orange)"],[w.actPace,"var(--blue)"]].filter(d=>d[0]);
+  <div class="icard"><h3>Pace trend — LT2 · VO2max · Overig</h3>
+    <div style="font-size:12px;color:var(--t3);margin-bottom:12px">Tempo per week — lager = sneller</div>
+    ${wd.some(w=>w.lt2Pace||w.vo2Pace||w.actPace)?`
+    <div class="legend" style="margin-top:0;margin-bottom:14px"><span><i style="background:var(--orange)"></i>LT2</span><span><i style="background:var(--red)"></i>VO2max</span><span><i style="background:var(--blue)"></i>Overig</span></div>
+    <div style="display:flex;align-items:flex-end;gap:4px;height:120px">${wd.map((w,i) => {
+      const dots=[[w.lt2Pace,"var(--orange)"],[w.vo2Pace,"var(--red)"],[w.actPace,"var(--blue)"]].filter(d=>d[0]);
       if(!dots.length) return `<div style="flex:1;position:relative;height:100%"><div style="position:absolute;bottom:-16px;left:50%;transform:translateX(-50%);font-size:10px;color:var(--t3)">${countdownShort(w.w)}</div></div>`;
-      const minP=200, maxP=420;
-      return `<div style="flex:1;position:relative;height:100%">${dots.map(d=>{const p=Math.max(0,Math.min(100,(1-(d[0]-minP)/(maxP-minP))*100));return`<div style="position:absolute;bottom:${p}%;left:50%;transform:translate(-50%,50%)"><div style="width:9px;height:9px;border-radius:50%;background:${d[1]}"></div><div style="font-size:8px;font-weight:700;color:var(--t2);font-family:var(--mono);text-align:center;margin-top:1px">${secondsToPace(d[0])}</div></div>`;}).join("")}<div style="position:absolute;bottom:-16px;left:50%;transform:translateX(-50%);font-size:10px;font-weight:${i===planWeekIdx?800:600};color:${i===planWeekIdx?"var(--orange)":"var(--t3)"}">${countdownShort(w.w)}</div></div>`;
+      const minP=170, maxP=420;
+      return `<div style="flex:1;position:relative;height:100%">${dots.map(d=>{const p=Math.max(0,Math.min(100,(1-(d[0]-minP)/(maxP-minP))*100));return`<div style="position:absolute;bottom:${p}%;left:50%;transform:translate(-50%,50%)"><div style="width:8px;height:8px;border-radius:50%;background:${d[1]}"></div><div style="font-size:7px;font-weight:700;color:var(--t2);font-family:var(--mono);text-align:center;margin-top:1px;white-space:nowrap">${secondsToPace(d[0])}</div></div>`;}).join("")}<div style="position:absolute;bottom:-16px;left:50%;transform:translateX(-50%);font-size:10px;font-weight:${i===planWeekIdx?800:600};color:${i===planWeekIdx?"var(--orange)":"var(--t3)"}">${countdownShort(w.w)}</div></div>`;
     }).join("")}</div>
     <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--t3);margin-top:20px;font-family:var(--mono)"><span>sneller</span><span>langzamer</span></div>
     `:`<div style="color:var(--t3);text-align:center;padding:20px">Log sessies met pace om trends te zien</div>`}
@@ -152,15 +155,15 @@ function insightsType() {
     const avgKm = sorted.reduce((s,e)=>s+e.km,0)/sorted.length;
     const hrs = sorted.filter(e=>e.hr>0).map(e=>e.hr);
     const paces = sorted.map(e=>parsePaceToSeconds(e.pace)).filter(Boolean);
-    const totalPlanMin = isInt ? sorted.reduce((s,e)=>s+(e.plannedMinutes||0),0) : 0;
-    const totalActMin = isInt ? sorted.reduce((s,e)=>s+(e.actualMinutes||0),0) : 0;
+    const totalPlanSec = isInt ? sorted.reduce((s,e)=>s+((e.plannedMinutes||0)*60),0) : 0;
+    const totalActSec = isInt ? sorted.reduce((s,e)=>s+(e.actualMinutes||0),0) : 0;
     return `<div class="icard"><h3>${tp.icon} ${tp.name} — ${sorted.length} sessies</h3>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px">
         <div><div style="font-size:10px;color:var(--t3);margin-bottom:2px">Gem. km</div><div style="font-size:18px;font-weight:700">${avgKm.toFixed(1)}</div></div>
         <div><div style="font-size:10px;color:var(--t3);margin-bottom:2px">Gem. HR</div><div style="font-size:18px;font-weight:700">${hrs.length?Math.round(hrs.reduce((a,b)=>a+b,0)/hrs.length):"–"}</div></div>
         <div><div style="font-size:10px;color:var(--t3);margin-bottom:2px">Gem. Pace</div><div style="font-size:18px;font-weight:700;font-family:var(--mono)">${paces.length?secondsToPace(paces.reduce((a,b)=>a+b,0)/paces.length):"–"}</div></div>
       </div>
-      ${isInt && totalPlanMin > 0 ? `<div style="font-size:13px;color:var(--t2);margin-bottom:8px">Totaal minuten: <span style="font-weight:700">${totalActMin}</span> <span style="color:var(--t3)">/ ${totalPlanMin} gepland</span></div>` : ""}
+      ${isInt && totalPlanSec > 0 ? `<div style="font-size:13px;color:var(--t2);margin-bottom:8px">Totaal tijd op intensiteit: <span style="font-weight:700">${fmtMinSec(totalActSec)}</span> <span style="color:var(--t3)">/ ${fmtMinSec(totalPlanSec)} gepland</span></div>` : ""}
       ${paces.length>1?`<div style="display:flex;align-items:flex-end;gap:4px;height:50px;margin-top:8px">${sorted.filter(e=>parsePaceToSeconds(e.pace)).map(e=>{const p=parsePaceToSeconds(e.pace),mn=Math.min(...paces)-10,mx2=Math.max(...paces)+10,h=Math.round((1-(p-mn)/(mx2-mn))*45);return`<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px"><div style="font-size:8px;color:var(--t3);font-family:var(--mono)">${secondsToPace(p)}</div><div style="width:100%;height:${Math.max(2,h)}px;background:${tp.color};border-radius:2px 2px 0 0"></div></div>`;}).join("")}</div>`:""}</div>`;
   }).join("");
 }

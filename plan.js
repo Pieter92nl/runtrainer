@@ -54,7 +54,7 @@ function planLoggedHTML(l, type, sess) {
     <span class="tag">${l.km} km</span>
     ${l.hr ? `<span class="tag">${isInt?"⚡ ":""}${l.hr} bpm</span>` : ""}
     ${l.pace ? `<span class="tag" style="font-family:var(--mono)">${isInt?"⚡ ":""}${l.pace}/km</span>` : ""}
-    ${isInt && l.actualMinutes ? `<span class="tag">${l.actualMinutes} min</span>` : ""}
+    ${isInt && l.actualMinutes ? `<span class="tag">${fmtMinSec(l.actualMinutes)}</span>` : ""}
     ${terrain ? `<span class="tag">${terrain}</span>` : ""}
     <span class="stars">${stars}</span>
     ${l.notes ? `<span style="color:var(--t3);font-style:italic">${l.notes.substring(0,35)}${l.notes.length>35?"…":""}</span>` : ""}
@@ -83,7 +83,7 @@ function openPlanLog(planId, weekNum, si) {
     <div class="field"><label>${type.hrLabel || "Gem. HR"} (bpm)</label><input type="number" id="f-hr" value="${ex?.hr ?? ""}" placeholder="—" inputmode="numeric"></div>
     <div class="field"><label>${type.paceLabel || "Gem. Pace"} (m:ss)</label><input type="text" id="f-pace" value="${ex?.pace ?? ""}" placeholder="${type.pacePlaceholder || "5:30"}" inputmode="text"></div>
   </div>
-  ${isInt ? `<div class="field"><label>Minuten op intensiteit</label><input type="number" id="f-actmin" value="${ex?.actualMinutes ?? sess.plannedMinutes ?? ""}" placeholder="${sess.plannedMinutes ? "Gepland: "+sess.plannedMinutes+" min" : "—"}" inputmode="numeric"></div>` : ""}
+  ${isInt ? `<div class="field"><label>Tijd op intensiteit (mm:ss)</label><input type="text" id="f-actmin" value="${ex?.actualMinutes ? fmtMinSec(ex.actualMinutes) : ""}" placeholder="${sess.plannedMinutes ? "Gepland: "+sess.plannedMinutes+" min" : "—"}" inputmode="text"></div>` : ""}
   <div class="field"><label>Terrein</label><div class="terrain-toggle"><button class="terrain-btn ${currentTerrain==="road"?"sel":""}" onclick="setTerrain('road')">🛣️ Verhard</button><button class="terrain-btn ${currentTerrain==="trail"?"sel":""}" onclick="setTerrain('trail')">🌲 Onverhard</button></div></div>
   <div class="field"><label>Gevoel</label><div class="feels">${[1,2,3,4,5].map(n => `<button class="feel ${n===shFeel?"sel":""}" onclick="pickFeel(${n})">${FE[n-1]}</button>`).join("")}</div></div>
   <div class="field"><label>Notities</label><textarea id="f-notes" placeholder="Hoe voelde het?">${ex?.notes ?? ""}</textarea></div>
@@ -98,8 +98,23 @@ function pickFeel(n) { shFeel = n; document.querySelectorAll(".feel").forEach((b
 function savePlanLog() {
   const entry = { km: parseFloat($("f-km").value) || 0, hr: parseInt($("f-hr").value) || 0, pace: $("f-pace").value.trim(), feel: shFeel, terrain: currentTerrain, notes: $("f-notes").value.trim() };
   const actMinEl = $("f-actmin");
-  if (actMinEl) entry.actualMinutes = parseInt(actMinEl.value) || 0;
+  if (actMinEl && actMinEl.value.trim()) entry.actualMinutes = parseMinSec(actMinEl.value.trim());
   setLog(shPlanId, shWeek, shSi, entry);
   closeSheet(); save(); render();
+}
+
+// mm:ss helpers for actual minutes on intensity
+function parseMinSec(val) {
+  if (!val) return 0;
+  const parts = val.split(":");
+  if (parts.length === 2) { const m = parseInt(parts[0]) || 0, s = parseInt(parts[1]) || 0; return m * 60 + s; }
+  // If just a number, treat as whole minutes
+  const n = parseFloat(val);
+  return isNaN(n) ? 0 : Math.round(n * 60);
+}
+function fmtMinSec(totalSecs) {
+  if (!totalSecs || totalSecs <= 0) return "";
+  const m = Math.floor(totalSecs / 60), s = Math.round(totalSecs % 60);
+  return s > 0 ? `${m}:${s.toString().padStart(2,"0")}` : `${m}:00`;
 }
 function delPlanLog() { delLogEntry(shPlanId, shWeek, shSi); closeSheet(); save(); render(); }

@@ -31,7 +31,7 @@ function openTypeSheet(idx) {
     {c:"#3B82F6",d:"rgba(59,130,246,.10)"},{c:"#FACC15",d:"rgba(250,204,21,.10)"},{c:"#34D399",d:"rgba(52,211,153,.10)"}
   ];
   window._typeColor = t.color; window._typeColorDim = t.colorDim;
-  window._typeLogMode = t.hint?.includes("intervallen") ? "interval" : "activity";
+  window._typeLogMode = t.isInterval ? "interval" : (t.hint?.includes("intervallen") ? "interval" : "activity");
 
   $("sh").innerHTML = `
   <div class="sheet-bar"></div>
@@ -58,6 +58,7 @@ function saveType(idx) {
   const obj = {
     id: idx !== null ? state.sessionTypes[idx].id : name.toLowerCase().replace(/\s+/g,"-")+"-"+Date.now(),
     name, icon: $("tp-icon").value || "🏃", color: window._typeColor, colorDim: window._typeColorDim,
+    isInterval,
     fields:["km","hr","pace","feel","terrain","notes"],
     hrLabel: isInterval ? "HR intervallen" : "Gem. HR",
     paceLabel: isInterval ? "Pace intervallen" : "Gem. Pace",
