@@ -157,6 +157,23 @@ function migrateOldData() {
       const nk = logKey("hm-2026", nw, si); if (!state.logs[nk]) state.logs[nk] = { ...val, terrain: val.terrain || "road" }; }}
     localStorage.setItem("hm-v2-migrated", "1");
   }} catch (e) { console.error("Migration:", e); }
+
+  // One-time: convert actualMinutes from whole minutes to seconds
+  // Skip week 7 (already corrected manually)
+  if (!localStorage.getItem("hm-v2-minsec")) {
+    let fixed = 0;
+    for (const [key, val] of Object.entries(state.logs)) {
+      if (val.actualMinutes && val.actualMinutes > 0 && val.actualMinutes < 120) {
+        // Skip week 7 (key format: planId:weekNum:si)
+        const parts = key.split(":");
+        if (parts[1] === "7") continue;
+        val.actualMinutes = val.actualMinutes * 60;
+        fixed++;
+      }
+    }
+    if (fixed > 0) console.log(`Migrated ${fixed} logs: actualMinutes → seconds`);
+    localStorage.setItem("hm-v2-minsec", "1");
+  }
 }
 
 function ensureDefaults() {

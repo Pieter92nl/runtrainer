@@ -113,7 +113,7 @@ function parseMinSec(val) {
   return isNaN(n) ? 0 : Math.round(n * 60);
 }
 function fmtMinSec(totalSecs) {
-  if (!totalSecs || totalSecs <= 0) return "";
+  if (!totalSecs || totalSecs <= 0) return "0:00";
   const m = Math.floor(totalSecs / 60), s = Math.round(totalSecs % 60);
   return s > 0 ? `${m}:${s.toString().padStart(2,"0")}` : `${m}:00`;
 }
