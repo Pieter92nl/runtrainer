@@ -44,5 +44,3 @@ more.js       → Menu, profiel, debug console
 ## Debug
 
 Onder **Meer → Profiel** zit een ingebouwde debug console. Tik op "Kopieer log voor Claude" om foutmeldingen te delen.
-
-update
