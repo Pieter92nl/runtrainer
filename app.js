@@ -41,6 +41,11 @@ function getCurrentCalWeek() {
 function getAutoWeekIdx(plan) { const cw = getCurrentCalWeek(), cy = new Date().getFullYear(); for (let i = 0; i < plan.weeks.length; i++) { if (plan.weeks[i].calWeek === cw && plan.weeks[i].year === cy) return i; } return 0; }
 function syncDot() { return `<span class="sync-dot ${syncState}"></span>`; }
 
+// Zichtbare sluitknop voor alle sheets (fix voor "onzichtbare terugknop")
+function sheetX() {
+  return `<button onclick="closeSheet()" aria-label="Sluiten" style="position:absolute;top:14px;right:16px;width:34px;height:34px;border-radius:50%;background:var(--s2);border:1px solid var(--s3);color:var(--t2);font-size:14px;font-weight:600;cursor:pointer;z-index:2;display:flex;align-items:center;justify-content:center">✕</button>`;
+}
+
 function getComputedVo2maxPace() {
   const lt2Secs = parsePaceToSeconds(state.settings.profile.lt2Pace);
   const offset = state.settings.profile.vo2maxOffset || 15;
@@ -127,19 +132,38 @@ async function loadDrive() {
   } catch (e) { console.error("loadDrive:", e); syncState = "err"; }
   saveLocal(); render();
 }
-async function saveDrive() {
+async function saveDrive(retried) {
   if (!token) { syncState = "off"; return; } syncState = "saving"; render();
   const payload = JSON.stringify({ sessionTypes: state.sessionTypes, plans: state.plans, logs: state.logs, activePlanId: state.activePlanId, settings: state.settings });
-  try { const fm = new FormData();
-  if (!fileId) { fm.append("metadata", new Blob([JSON.stringify({ name: FNAME, parents: ["appDataFolder"] })], { type: "application/json" }));
-    fm.append("file", new Blob([payload], { type: "application/json" }));
-    const r = await fetch(`${UAPI}/files?uploadType=multipart`, { method: "POST", headers: { "Authorization": "Bearer " + token }, body: fm });
-    if (r.ok) { const d = await r.json(); fileId = d.id; syncState = "ok"; } else { syncState = r.status === 401 ? (token = null, "off") : "err"; }
-  } else { fm.append("metadata", new Blob(["{}"], { type: "application/json" }));
-    fm.append("file", new Blob([payload], { type: "application/json" }));
-    const r = await fetch(`${UAPI}/files/${fileId}?uploadType=multipart`, { method: "PATCH", headers: { "Authorization": "Bearer " + token }, body: fm });
-    if (r.ok) syncState = "ok"; else syncState = r.status === 401 ? (token = null, "off") : "err";
-  }} catch (e) { console.error("saveDrive:", e); syncState = "err"; }
+  try {
+    const fm = new FormData();
+    let r;
+    if (!fileId) {
+      fm.append("metadata", new Blob([JSON.stringify({ name: FNAME, parents: ["appDataFolder"] })], { type: "application/json" }));
+      fm.append("file", new Blob([payload], { type: "application/json" }));
+      r = await fetch(`${UAPI}/files?uploadType=multipart`, { method: "POST", headers: { "Authorization": "Bearer " + token }, body: fm });
+      if (r.ok) { const d = await r.json(); fileId = d.id; syncState = "ok"; }
+    } else {
+      fm.append("metadata", new Blob(["{}"], { type: "application/json" }));
+      fm.append("file", new Blob([payload], { type: "application/json" }));
+      r = await fetch(`${UAPI}/files/${fileId}?uploadType=multipart`, { method: "PATCH", headers: { "Authorization": "Bearer " + token }, body: fm });
+      if (r.ok) syncState = "ok";
+    }
+    if (!r.ok) {
+      // 401: token verlopen → silent refresh + één retry (voorheen: direct uitloggen)
+      if (r.status === 401 && !retried) {
+        const refreshed = await handleAuth401();
+        if (refreshed) return saveDrive(true);
+      }
+      // 404 op PATCH: fileId verouderd (bestand verwijderd) → opnieuw aanmaken
+      if (r.status === 404 && !retried) {
+        console.warn("Drive file niet gevonden, opnieuw aanmaken...");
+        fileId = null;
+        return saveDrive(true);
+      }
+      syncState = "err";
+    }
+  } catch (e) { console.error("saveDrive:", e); syncState = "err"; }
   render();
 }
 function saveLocal() { try { localStorage.setItem("hm-v2", JSON.stringify(state)); } catch (e) {} }
@@ -178,12 +202,19 @@ function migrateOldData() {
 
 function ensureDefaults() {
   if (!state.sessionTypes.length) state.sessionTypes = JSON.parse(JSON.stringify(DEFAULT_TYPES));
-  // Sync icons/colors from defaults to stored types (one-way merge)
-  DEFAULT_TYPES.forEach(dt => {
+  // Sync vanuit defaults naar opgeslagen types (one-way merge) + voeg ONTBREKENDE defaults toe.
+  // (Voorheen bereikten nieuwe default-types bestaande gebruikers nooit.)
+  DEFAULT_TYPES.forEach((dt, di) => {
     const existing = state.sessionTypes.find(t => t.id === dt.id);
     if (existing) {
       existing.icon = dt.icon;
       existing.isInterval = dt.isInterval;
+      existing.pacePlaceholder = dt.pacePlaceholder;
+    } else {
+      // Invoegen op de default-positie waar mogelijk, anders achteraan
+      const insertAt = Math.min(di, state.sessionTypes.length);
+      state.sessionTypes.splice(insertAt, 0, JSON.parse(JSON.stringify(dt)));
+      console.log(`Nieuw sessietype toegevoegd: ${dt.name}`);
     }
   });
   // Ensure vo2maxOffset exists in profile

@@ -25,7 +25,7 @@ function renderPlan() {
 function planCardHTML(plan, week, sess, idx) {
   const type = getType(sess.typeId), l = getLog(plan.id, week.week, idx);
   const isInt = isIntervalType(sess.typeId);
-  const workLabel = sess.typeId === "vo2max" ? "VO2max" : "LT2";
+  const workLabel = sess.typeId === "vo2max" ? "VO2max" : sess.typeId === "longq" ? "HM" : "LT2";
 
   return `<div class="card ${l?"logged":""}" onclick="openPlanLog('${plan.id}',${week.week},${idx})">
     <div class="card-top">
@@ -74,6 +74,7 @@ function openPlanLog(planId, weekNum, si) {
   shFeel = ex?.feel ?? 3; currentTerrain = ex?.terrain || "road";
 
   $("sh").innerHTML = `
+  ${sheetX()}
   <div class="sheet-bar"></div>
   <h2>${type.icon} ${type.name}</h2>
   <div class="sub">${countdownPill(weekNum)} — ${sess.desc || type.name}</div>

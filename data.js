@@ -11,6 +11,12 @@ const DEFAULT_TYPES = [
     fields:["km","hr","pace","feel","terrain","notes"],
     hrLabel:"Gem. HR", paceLabel:"Gem. Pace", pacePlaceholder:"5:30",
     kmLabel:"Afstand", hint:"Vul het gemiddelde van de hele activiteit in" },
+  { id:"longq", name:"Long Run Q (HM-blokken)", icon:"🎯", color:"#34D399", colorDim:"rgba(52,211,153,.10)",
+    isInterval:true,
+    fields:["km","hr","pace","feel","terrain","notes","actualMinutes"],
+    hrLabel:"HR blokken", paceLabel:"Pace blokken", pacePlaceholder:"4:18",
+    kmLabel:"Totale afstand incl. easy-gedeelte",
+    hint:"Vul tempo en hartslag van de HM-blokken in; afstand is de hele run" },
   { id:"easy", name:"Easy Run", icon:"🏃", color:"#8B8B96", colorDim:"rgba(139,139,150,.10)",
     isInterval:false,
     fields:["km","hr","pace","feel","terrain","notes"],
@@ -29,7 +35,7 @@ const DEFAULT_TYPES = [
   { id:"vo2max", name:"VO2max Intervallen", icon:"🔴", color:"#EF4444", colorDim:"rgba(239,68,68,.10)",
     isInterval:true,
     fields:["km","hr","pace","feel","terrain","notes","actualMinutes"],
-    hrLabel:"HR intervallen", paceLabel:"Pace intervallen", pacePlaceholder:"3:55",
+    hrLabel:"HR intervallen", paceLabel:"Pace intervallen", pacePlaceholder:"3:40",
     kmLabel:"Totale afstand incl. w-up/c-down",
     hint:"Vul tempo en hartslag van de intervallen in, niet van de hele activiteit" },
   { id:"tempo", name:"Tempo Run", icon:"⏱️", color:"#3B82F6", colorDim:"rgba(59,130,246,.10)",
@@ -143,6 +149,14 @@ function getMonthOfCalWeek(calWeek, year) {
   const thursday = new Date(targetMonday);
   thursday.setDate(targetMonday.getDate() + 3);
   return thursday.getMonth();
+}
+
+// ISO 8601: a year has 53 weeks if Jan 1 is a Thursday, or in a leap year if Jan 1 is a Wednesday.
+// (2026 has 53 weeks!)
+function weeksInYear(year) {
+  const jan1 = new Date(year, 0, 1).getDay(); // 0=zo … 4=do
+  const leap = (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+  return (jan1 === 4 || (leap && jan1 === 3)) ? 53 : 52;
 }
 
 // ═══════════ PACE MATH ═══════════

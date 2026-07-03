@@ -2,6 +2,7 @@
 function renderTimeline() {
   const year = new Date().getFullYear();
   const currentCW = getCurrentCalWeek();
+  const totalWeeks = weeksInYear(year); // 2026 heeft 53 ISO-weken
 
   // Build week map
   const weekMap = {};
@@ -17,7 +18,7 @@ function renderTimeline() {
   let lastMonth = -1;
   const rows = [];
 
-  for (let cw = 1; cw <= 52; cw++) {
+  for (let cw = 1; cw <= totalWeeks; cw++) {
     const month = getMonthOfCalWeek(cw, year);
 
     // Month separator

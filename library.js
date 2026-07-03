@@ -34,6 +34,7 @@ function openTypeSheet(idx) {
   window._typeLogMode = t.isInterval ? "interval" : (t.hint?.includes("intervallen") ? "interval" : "activity");
 
   $("sh").innerHTML = `
+  ${sheetX()}
   <div class="sheet-bar"></div>
   <h2>${isEdit ? "Type bewerken" : "Nieuw sessietype"}</h2>
   <div class="sub">${isEdit ? t.name : "Voeg een nieuw trainingstype toe"}</div>

@@ -6,7 +6,10 @@ function renderBuilder() {
     return `<div style="margin-bottom:20px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
         <h2 style="font-size:18px;font-weight:700">Plannen</h2>
-        <button onclick="createNewPlan()" style="padding:8px 16px;background:var(--orange);border:none;border-radius:10px;color:#000;font-size:13px;font-weight:700;cursor:pointer">+ Nieuw plan</button>
+        <div style="display:flex;gap:8px">
+          <button onclick="openImportSheet()" style="padding:8px 14px;background:var(--s2);border:1px solid var(--s3);border-radius:10px;color:var(--t2);font-size:13px;font-weight:600;cursor:pointer">⬆ Importeer</button>
+          <button onclick="createNewPlan()" style="padding:8px 16px;background:var(--orange);border:none;border-radius:10px;color:#000;font-size:13px;font-weight:700;cursor:pointer">+ Nieuw plan</button>
+        </div>
       </div>
       ${state.plans.map(p => {
         const isActive = p.id === state.activePlanId, totalKm = p.weeks.reduce((s,w) => s + weekPlannedKm(p,w), 0);
@@ -69,7 +72,7 @@ function renderBuilder() {
         ${w.sessions.map((s,si) => {
           const type = getType(s.typeId);
           const isInt = isIntervalType(s.typeId);
-          const workLabel = s.typeId === "vo2max" ? "VO2max" : "LT2";
+          const workLabel = s.typeId === "vo2max" ? "VO2max" : s.typeId === "longq" ? "HM" : "LT2";
           return `<div style="padding:10px;background:var(--s2);border-radius:10px;margin-bottom:6px">
             <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
               <span style="font-size:16px">${type.icon}</span>
@@ -130,17 +133,34 @@ function updatePlanMeta(id, key, val) {
 
 function recalcCountdown(plan) {
   if (!plan.targetDate) return;
-  const target = new Date(plan.targetDate), targetCW = getCalWeekOfDate(target), targetYear = target.getFullYear();
-  plan.weeks.forEach(w => { w.week = Math.max(0, (targetYear * 52 + targetCW) - (w.year * 52 + w.calWeek)); });
+  const target = new Date(plan.targetDate), targetCW = getCalWeekOfDate(target), targetYear = getISOYearOfDate(target);
+  plan.weeks.forEach(w => { w.week = Math.max(0, (targetYear * 53 + targetCW) - (w.year * 53 + w.calWeek)); });
   plan.weeks.sort((a, b) => b.week - a.week);
 }
-function getCalWeekOfDate(date) { const jan1 = new Date(date.getFullYear(), 0, 1); return Math.ceil(((date - jan1) / 86400000 + jan1.getDay() + 1) / 7); }
+
+// ISO 8601 weeknummer van een datum (consistent met getCurrentCalWeek).
+// Voorheen niet-ISO → countdown kon een week verschuiven.
+function getCalWeekOfDate(date) {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+}
+// ISO-jaar kan afwijken van kalenderjaar rond de jaarwisseling
+function getISOYearOfDate(date) {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  return d.getUTCFullYear();
+}
 
 function addWeekToPlan(id) {
   const plan = state.plans.find(p => p.id === id); if (!plan) return;
   const last = plan.weeks[plan.weeks.length - 1];
-  const newCW = last ? (last.calWeek % 52) + 1 : getCurrentCalWeek();
-  const newYear = last ? (last.calWeek >= 52 ? last.year + 1 : last.year) : new Date().getFullYear();
+  const wiy = last ? weeksInYear(last.year) : 52;
+  const newCW = last ? (last.calWeek >= wiy ? 1 : last.calWeek + 1) : getCurrentCalWeek();
+  const newYear = last ? (last.calWeek >= wiy ? last.year + 1 : last.year) : new Date().getFullYear();
   plan.weeks.push({ week: 0, calWeek: newCW, year: newYear, dates: "", phase: "Opbouw", phaseColor: "blue", sessions: [] });
   recalcCountdown(plan); builderWeekIdx = plan.weeks.length - 1; save(); render();
 }
@@ -175,7 +195,8 @@ function removeSession(id, wi, si) {
 function copyWeek(id, wi) {
   const plan = state.plans.find(p => p.id === id); if (!plan) return;
   const src = plan.weeks[wi];
-  const copy = { ...JSON.parse(JSON.stringify(src)), calWeek: (src.calWeek % 52) + 1, year: src.calWeek >= 52 ? src.year + 1 : src.year, week: 0 };
+  const wiy = weeksInYear(src.year);
+  const copy = { ...JSON.parse(JSON.stringify(src)), calWeek: src.calWeek >= wiy ? 1 : src.calWeek + 1, year: src.calWeek >= wiy ? src.year + 1 : src.year, week: 0 };
   plan.weeks.splice(wi + 1, 0, copy); recalcCountdown(plan); builderWeekIdx = wi + 1; save(); render();
 }
 
@@ -194,7 +215,7 @@ function deletePlan(id) {
 }
 
 function openAddSession(id, wi) {
-  $("sh").innerHTML = `<div class="sheet-bar"></div><h2>Sessie toevoegen</h2><div class="sub">Kies een trainingstype</div>
+  $("sh").innerHTML = `${sheetX()}<div class="sheet-bar"></div><h2>Sessie toevoegen</h2><div class="sub">Kies een trainingstype</div>
   <div style="display:flex;flex-direction:column;gap:8px">${state.sessionTypes.map(t => `
     <button onclick="addSessionToPlan('${id}',${wi},'${t.id}')" style="display:flex;align-items:center;gap:12px;padding:14px;background:var(--s2);border:1px solid var(--s3);border-radius:12px;cursor:pointer;width:100%;text-align:left">
       <span style="font-size:20px">${t.icon}</span>
@@ -210,4 +231,78 @@ function addSessionToPlan(id, wi, typeId) {
   if (isIntervalType(typeId)) { sess.plannedMinutes = 0; sess.workKm = 0; }
   plan.weeks[wi].sessions.push(sess);
   closeSheet(); save(); render();
+}
+
+// ═══════════ PLAN IMPORT (JSON) ═══════════
+// Puur client-side. Importeert ALTIJD als nieuw plan met vers ID —
+// bestaande plannen en logs worden nooit overschreven. Data gaat alleen
+// via de bestaande Drive-sync, nergens anders heen.
+function openImportSheet() {
+  $("sh").innerHTML = `${sheetX()}<div class="sheet-bar"></div><h2>Plan importeren</h2>
+  <div class="sub">Kies een JSON-bestand of plak de JSON. Wordt toegevoegd als nieuw plan — bestaande plannen en logs blijven onaangetast.</div>
+  <div class="field"><label>Bestand</label><input type="file" id="imp-file" accept=".json,application/json" onchange="importPlanFile(this)" style="width:100%;color:var(--t2);font-size:13px"></div>
+  <div class="field"><label>Of plak JSON</label><textarea id="imp-text" style="min-height:120px;font-family:var(--mono);font-size:12px" placeholder='{"name":"…","weeks":[…]}'></textarea></div>
+  <div id="imp-err" style="color:var(--red);font-size:13px;margin-bottom:14px;line-height:1.5"></div>
+  <button class="btn-save" onclick="importPlanText()">Importeer</button>`;
+  $("ov").classList.add("open"); $("sh").classList.add("open");
+}
+
+function importPlanFile(input) {
+  const f = input.files && input.files[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = () => doImportPlan(r.result);
+  r.onerror = () => { const el = $("imp-err"); if (el) el.textContent = "Bestand kon niet gelezen worden."; };
+  r.readAsText(f);
+}
+function importPlanText() { doImportPlan($("imp-text") ? $("imp-text").value : ""); }
+
+function validateImportPlan(p) {
+  if (!p || typeof p !== "object" || Array.isArray(p)) return "Geen geldig plan-object";
+  if (!Array.isArray(p.weeks) || !p.weeks.length) return "Plan mist 'weeks'";
+  for (const w of p.weeks) {
+    if (typeof w.calWeek !== "number" || typeof w.year !== "number") return "Een week mist 'calWeek' of 'year'";
+    if (typeof w.week !== "number") return "Een week mist countdown-nummer 'week'";
+    if (!Array.isArray(w.sessions)) return "Een week mist 'sessions'";
+    for (const s of w.sessions) {
+      if (!s.typeId) return "Een sessie mist 'typeId'";
+      if (typeof s.plannedKm !== "number") return "Een sessie mist 'plannedKm'";
+    }
+  }
+  return null;
+}
+
+function doImportPlan(text) {
+  const errEl = $("imp-err");
+  if (!text || !text.trim()) { if (errEl) errEl.textContent = "Geen JSON opgegeven."; return; }
+  let data;
+  try { data = JSON.parse(text); }
+  catch (e) { if (errEl) errEl.textContent = "Ongeldige JSON: " + e.message; return; }
+
+  // Accepteert een los plan-object óf een volledige export ({plans:[…]}).
+  // Bij een volledige export worden alléén de plannen geïmporteerd (geen logs/settings).
+  const plansIn = Array.isArray(data.plans) ? data.plans : [data];
+  const imported = [], unknownTypes = new Set();
+  let firstErr = null;
+
+  for (const p of plansIn) {
+    const err = validateImportPlan(p);
+    if (err) { if (!firstErr) firstErr = err; continue; }
+    const clone = JSON.parse(JSON.stringify(p));
+    clone.id = "plan-import-" + Date.now() + "-" + Math.floor(Math.random() * 10000); // nooit botsen/overschrijven
+    clone.name = String(clone.name || "Geïmporteerd plan").replace(/[<>]/g, "");
+    clone.createdAt = Date.now();
+    clone.weeks.forEach(w => w.sessions.forEach(s => {
+      const known = state.sessionTypes.find(t => t.id === s.typeId) || DEFAULT_TYPES.find(t => t.id === s.typeId);
+      if (!known) unknownTypes.add(s.typeId);
+    }));
+    state.plans.push(clone);
+    imported.push(clone);
+  }
+
+  if (!imported.length) { if (errEl) errEl.textContent = firstErr || "Niets te importeren."; return; }
+
+  builderPlanId = imported[0].id; builderWeekIdx = 0;
+  closeSheet(); save(); render();
+  console.log(`Plan geïmporteerd: ${imported.map(p => p.name).join(", ")}`);
+  if (unknownTypes.size) alert("Let op: onbekende sessietypes (vallen terug op Easy Run): " + [...unknownTypes].join(", "));
 }
