@@ -1,6 +1,6 @@
 # HM Trainer
 
-A personal training planner and logbook for running. Built as a lightweight web app, hosted on GitHub Pages, with Google Drive as storage. Designed with ChatGPT & Claude Opus 4.6.
+A personal training planner and logbook for running. Built as a lightweight web app, hosted on GitHub Pages, with Google Drive as storage. Designed with Claude.
 
 ## What it does
 
