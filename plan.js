@@ -27,11 +27,11 @@ function planCardHTML(plan, week, sess, idx) {
   const isInt = isIntervalType(sess.typeId);
   const workLabel = sess.typeId === "vo2max" ? "VO2max" : sess.typeId === "longq" ? "HM" : "LT2";
 
-  return `<div class="card ${l?"logged":""}" onclick="openPlanLog('${plan.id}',${week.week},${idx})">
+  return `<div class="card ${l?"logged":""}" onclick="openPlanLog('${plan.id}',${week.week},${idx})" style="${l?.isBike ? "border-left:3px solid var(--teal)" : ""}">
     <div class="card-top">
-      <div class="card-ico" style="background:${type.colorDim}">${type.icon}</div>
+      <div class="card-ico" style="background:${type.colorDim}">${l?.isBike ? "🚴" : type.icon}</div>
       <div style="flex:1">
-        <div class="card-title">${type.name}</div>
+        <div class="card-title">${type.name}${l?.isBike ? ` <span style="font-size:11px;font-weight:600;color:var(--teal)">· fiets</span>` : ""}</div>
         ${sess.desc ? `<div class="card-desc">${sess.desc}</div>` : ""}
       </div>
       <div class="card-check ${l?"done":""}">${l?"✓":""}</div>
@@ -47,8 +47,19 @@ function planCardHTML(plan, week, sess, idx) {
 }
 
 function planLoggedHTML(l, type, sess) {
-  const isInt = type.isInterval;
   const stars = "★".repeat(l.feel || 0) + "☆".repeat(5 - (l.feel || 0));
+
+  if (l.isBike) {
+    return `<div class="card-log">
+      <span class="tag">🚴 ${fmtMinSec(l.bikeMinutes || 0)}</span>
+      ${l.hr ? `<span class="tag">${l.hr} bpm</span>` : ""}
+      <span class="tag">${l.bikeIntensity === "tempo" ? "Tempo" : "Rustig"}</span>
+      <span class="stars">${stars}</span>
+      ${l.notes ? `<span style="color:var(--t3);font-style:italic">${l.notes.substring(0,35)}${l.notes.length>35?"…":""}</span>` : ""}
+    </div>`;
+  }
+
+  const isInt = type.isInterval;
   const terrain = l.terrain === "trail" ? "🌲" : "";
   return `<div class="card-log">
     <span class="tag">${l.km} km</span>
@@ -63,45 +74,97 @@ function planLoggedHTML(l, type, sess) {
 
 // ═══════════ LOG SHEET ═══════════
 let shPlanId, shWeek, shSi, shFeel = 3, currentTerrain = "road";
+let shBike = false, shBikeIntensity = "rustig";
 
 function openPlanLog(planId, weekNum, si) {
-  const plan = state.plans.find(p => p.id === planId); if (!plan) return;
-  const week = plan.weeks.find(w => w.week === weekNum); if (!week) return;
-  const sess = week.sessions[si]; if (!sess) return;
-  const type = getType(sess.typeId), ex = getLog(planId, weekNum, si);
-  const isInt = isIntervalType(sess.typeId);
+  const week = state.plans.find(p => p.id === planId)?.weeks.find(w => w.week === weekNum);
+  const sess = week?.sessions[si]; if (!sess) return;
+  const ex = getLog(planId, weekNum, si);
   shPlanId = planId; shWeek = weekNum; shSi = si;
   shFeel = ex?.feel ?? 3; currentTerrain = ex?.terrain || "road";
+  shBike = !!ex?.isBike; shBikeIntensity = ex?.bikeIntensity || "rustig";
+  renderLogSheet();
+}
+
+// Leest de huidige veldwaarden uit de DOM zodat een re-render (bijv. fiets-toggle)
+// ingevulde-maar-nog-niet-opgeslagen invoer niet weggooit.
+function captureLogDraft() {
+  const g = id => { const el = $(id); return el ? el.value : undefined; };
+  const d = {
+    km: g("f-km"), hr: g("f-hr"), pace: g("f-pace"), actmin: g("f-actmin"),
+    bikeMin: g("f-bike-min"), bikeHr: g("f-bike-hr"), notes: g("f-notes")
+  };
+  return Object.values(d).some(v => v !== undefined) ? d : null;
+}
+
+function renderLogSheet(draft) {
+  const plan = state.plans.find(p => p.id === shPlanId); if (!plan) return;
+  const week = plan.weeks.find(w => w.week === shWeek); if (!week) return;
+  const sess = week.sessions[shSi]; if (!sess) return;
+  const type = getType(sess.typeId), ex = getLog(shPlanId, shWeek, shSi);
+  const isInt = isIntervalType(sess.typeId);
+  const bikeAllowed = sess.typeId === "easy" || sess.typeId === "long";
+  // draft (live invoer) heeft voorrang op ex (opgeslagen), zodat togglen niets wist
+  const dv = (k, exVal) => (draft && draft[k] !== undefined && draft[k] !== "") ? draft[k] : exVal;
+
+  const bikeToggle = bikeAllowed ? `<button onclick="toggleBikeMode()" style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:${shBike?"var(--tealDim)":"var(--s2)"};border:1px solid ${shBike?"var(--teal)":"var(--s3)"};border-radius:12px;color:${shBike?"var(--teal)":"var(--t2)"};font-size:13px;font-weight:600;cursor:pointer;width:100%;margin-bottom:20px;justify-content:center">🚴 ${shBike?"Vervangen door fietsrit — aan":"Vervangen door fietsrit"}</button>` : "";
+
+  const bikeFields = `
+  <div class="field"><label>Duur (mm:ss)</label><input type="text" id="f-bike-min" value="${dv("bikeMin", ex?.isBike && ex.bikeMinutes ? fmtMinSec(ex.bikeMinutes) : "")}" placeholder="90:00" inputmode="text"></div>
+  <div class="field"><label>Gem. Hartslag fietsen (bpm)</label><input type="number" id="f-bike-hr" value="${dv("bikeHr", ex?.isBike ? (ex.hr ?? "") : "")}" placeholder="—" inputmode="numeric"></div>
+  <div class="field"><label>Intensiteit</label><div class="terrain-toggle">
+    <button type="button" class="terrain-btn ${shBikeIntensity==="rustig"?"sel":""}" onclick="setBikeIntensity('rustig')">Rustig</button>
+    <button type="button" class="terrain-btn ${shBikeIntensity==="tempo"?"sel":""}" onclick="setBikeIntensity('tempo')">Tempo</button>
+  </div></div>`;
+
+  const runFields = `
+  <div class="field"><label>${type.kmLabel || "Afstand"} (km)</label><input type="number" step="0.1" id="f-km" value="${dv("km", !ex?.isBike ? (ex?.km ?? sess.plannedKm) : sess.plannedKm)}" inputmode="decimal"></div>
+  <div class="grid2">
+    <div class="field"><label>${type.hrLabel || "Gem. HR"} (bpm)</label><input type="number" id="f-hr" value="${dv("hr", !ex?.isBike ? (ex?.hr ?? "") : "")}" placeholder="—" inputmode="numeric"></div>
+    <div class="field"><label>${type.paceLabel || "Gem. Pace"} (m:ss)</label><input type="text" id="f-pace" value="${dv("pace", !ex?.isBike ? (ex?.pace ?? "") : "")}" placeholder="${type.pacePlaceholder || "5:30"}" inputmode="text"></div>
+  </div>
+  ${isInt ? `<div class="field"><label>Tijd op intensiteit (mm:ss)</label><input type="text" id="f-actmin" value="${dv("actmin", !ex?.isBike && ex?.actualMinutes ? fmtMinSec(ex.actualMinutes) : "")}" placeholder="${sess.plannedMinutes ? "Gepland: "+sess.plannedMinutes+" min" : "—"}" inputmode="text"></div>` : ""}
+  <div class="field"><label>Terrein</label><div class="terrain-toggle"><button class="terrain-btn ${currentTerrain==="road"?"sel":""}" onclick="setTerrain('road')">🛣️ Verhard</button><button class="terrain-btn ${currentTerrain==="trail"?"sel":""}" onclick="setTerrain('trail')">🌲 Onverhard</button></div></div>`;
 
   $("sh").innerHTML = `
   ${sheetX()}
   <div class="sheet-bar"></div>
-  <h2>${type.icon} ${type.name}</h2>
-  <div class="sub">${countdownPill(weekNum)} — ${sess.desc || type.name}</div>
-  <div class="hint ${isInt?"lt2":"other"}" style="color:${type.color};background:${type.colorDim}">${type.hint || ""}</div>
-  <div class="field"><label>${type.kmLabel || "Afstand"} (km)</label><input type="number" step="0.1" id="f-km" value="${ex?.km ?? sess.plannedKm}" inputmode="decimal"></div>
-  <div class="grid2">
-    <div class="field"><label>${type.hrLabel || "Gem. HR"} (bpm)</label><input type="number" id="f-hr" value="${ex?.hr ?? ""}" placeholder="—" inputmode="numeric"></div>
-    <div class="field"><label>${type.paceLabel || "Gem. Pace"} (m:ss)</label><input type="text" id="f-pace" value="${ex?.pace ?? ""}" placeholder="${type.pacePlaceholder || "5:30"}" inputmode="text"></div>
-  </div>
-  ${isInt ? `<div class="field"><label>Tijd op intensiteit (mm:ss)</label><input type="text" id="f-actmin" value="${ex?.actualMinutes ? fmtMinSec(ex.actualMinutes) : ""}" placeholder="${sess.plannedMinutes ? "Gepland: "+sess.plannedMinutes+" min" : "—"}" inputmode="text"></div>` : ""}
-  <div class="field"><label>Terrein</label><div class="terrain-toggle"><button class="terrain-btn ${currentTerrain==="road"?"sel":""}" onclick="setTerrain('road')">🛣️ Verhard</button><button class="terrain-btn ${currentTerrain==="trail"?"sel":""}" onclick="setTerrain('trail')">🌲 Onverhard</button></div></div>
+  <h2>${shBike ? "🚴" : type.icon} ${type.name}${shBike ? " (fiets)" : ""}</h2>
+  <div class="sub">${countdownPill(shWeek)} — ${sess.desc || type.name}</div>
+  ${!shBike ? `<div class="hint ${isInt?"lt2":"other"}" style="color:${type.color};background:${type.colorDim}">${type.hint || ""}</div>` : ""}
+  ${bikeToggle}
+  ${shBike ? bikeFields : runFields}
   <div class="field"><label>Gevoel</label><div class="feels">${[1,2,3,4,5].map(n => `<button class="feel ${n===shFeel?"sel":""}" onclick="pickFeel(${n})">${FE[n-1]}</button>`).join("")}</div></div>
-  <div class="field"><label>Notities</label><textarea id="f-notes" placeholder="Hoe voelde het?">${ex?.notes ?? ""}</textarea></div>
+  <div class="field"><label>Notities</label><textarea id="f-notes" placeholder="Hoe voelde het?">${dv("notes", ex?.notes ?? "")}</textarea></div>
   <button class="btn-save" onclick="savePlanLog()">Opslaan</button>
   ${ex ? `<button class="btn-del" onclick="delPlanLog()">Verwijderen</button>` : ""}`;
   $("ov").classList.add("open"); $("sh").classList.add("open");
 }
 
-function setTerrain(v) { currentTerrain = v; document.querySelectorAll(".terrain-btn").forEach(b => b.classList.toggle("sel", b.textContent.includes(v === "road" ? "Verhard" : "Onverhard"))); }
+function toggleBikeMode() { const draft = captureLogDraft(); shBike = !shBike; renderLogSheet(draft); }
+function setBikeIntensity(v) { shBikeIntensity = v; document.querySelectorAll(".terrain-btn").forEach(b => { const t = b.textContent.trim(); if (t === "Rustig" || t === "Tempo") b.classList.toggle("sel", t.toLowerCase() === v); }); }
+function setTerrain(v) { currentTerrain = v; document.querySelectorAll(".terrain-btn").forEach(b => { if (b.textContent.includes("Verhard") || b.textContent.includes("Onverhard")) b.classList.toggle("sel", b.textContent.includes(v === "road" ? "Verhard" : "Onverhard")); }); }
 function pickFeel(n) { shFeel = n; document.querySelectorAll(".feel").forEach((b, i) => b.classList.toggle("sel", i + 1 === n)); }
 
 function savePlanLog() {
-  const entry = { km: parseFloat($("f-km").value) || 0, hr: parseInt($("f-hr").value) || 0, pace: $("f-pace").value.trim(), feel: shFeel, terrain: currentTerrain, notes: $("f-notes").value.trim() };
-  const actMinEl = $("f-actmin");
-  if (actMinEl && actMinEl.value.trim()) entry.actualMinutes = parseMinSec(actMinEl.value.trim());
+  let entry;
+  if (shBike) {
+    const minEl = $("f-bike-min");
+    entry = {
+      isBike: true, km: 0,
+      bikeMinutes: minEl ? parseMinSec(minEl.value.trim()) : 0,
+      hr: parseInt($("f-bike-hr")?.value) || 0,
+      bikeIntensity: shBikeIntensity,
+      feel: shFeel, notes: $("f-notes").value.trim()
+    };
+  } else {
+    entry = { km: parseFloat($("f-km").value) || 0, hr: parseInt($("f-hr").value) || 0, pace: $("f-pace").value.trim(), feel: shFeel, terrain: currentTerrain, notes: $("f-notes").value.trim() };
+    const actMinEl = $("f-actmin");
+    if (actMinEl && actMinEl.value.trim()) entry.actualMinutes = parseMinSec(actMinEl.value.trim());
+  }
   setLog(shPlanId, shWeek, shSi, entry);
   closeSheet(); save(); render();
+  showToast(syncState === "off" ? "Opgeslagen ✓ · lokaal" : "Opgeslagen ✓ · synct…");
 }
 
 // mm:ss helpers for actual minutes on intensity

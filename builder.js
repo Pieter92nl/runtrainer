@@ -189,7 +189,18 @@ function updatePlannedMinutes(id, wi, si, minutes) {
 
 function removeSession(id, wi, si) {
   const plan = state.plans.find(p => p.id === id); if (!plan) return;
-  plan.weeks[wi].sessions.splice(si, 1); save(); render();
+  const week = plan.weeks[wi];
+  const n = week.sessions.length;
+  // Logs zijn gekeyed op planId:weekNum:sessionIndex. Bij het verwijderen van sessie `si`
+  // moet het log van `si` weg en moeten logs van hogere indexen één omlaag schuiven,
+  // anders raken logs gekoppeld aan de verkeerde sessie.
+  delLogEntry(id, week.week, si);
+  for (let j = si + 1; j < n; j++) {
+    const moving = getLog(id, week.week, j);
+    delLogEntry(id, week.week, j);
+    if (moving) setLog(id, week.week, j - 1, moving);
+  }
+  week.sessions.splice(si, 1); save(); render();
 }
 
 function copyWeek(id, wi) {

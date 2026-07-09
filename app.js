@@ -29,7 +29,7 @@ function getType(typeId) {
 }
 function getActivePlan() { return state.plans.find(p => p.id === state.activePlanId) || state.plans[0] || null; }
 function weekPlannedKm(plan, w) { return w.sessions.reduce((s, sess) => s + (sess.plannedKm || 0), 0); }
-function weekLoggedKm(plan, w) { return w.sessions.reduce((s, _, i) => { const l = getLog(plan.id, w.week, i); return s + (l ? l.km : 0); }, 0); }
+function weekLoggedKm(plan, w) { return w.sessions.reduce((s, _, i) => { const l = getLog(plan.id, w.week, i); return s + (l ? (l.km || 0) : 0); }, 0); }
 function getCurrentCalWeek() {
   const now = new Date();
   const d = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
@@ -40,6 +40,21 @@ function getCurrentCalWeek() {
 }
 function getAutoWeekIdx(plan) { const cw = getCurrentCalWeek(), cy = new Date().getFullYear(); for (let i = 0; i < plan.weeks.length; i++) { if (plan.weeks[i].calWeek === cw && plan.weeks[i].year === cy) return i; } return 0; }
 function syncDot() { return `<span class="sync-dot ${syncState}"></span>`; }
+
+// Korte bevestigingstoast (D2) — leeft op <body>, overleeft re-renders van #app
+let _toastT = null;
+function showToast(msg) {
+  let el = document.getElementById("toast");
+  if (!el) {
+    el = document.createElement("div"); el.id = "toast";
+    el.style.cssText = "position:fixed;left:50%;bottom:calc(76px + var(--safe-b,0px));transform:translateX(-50%);background:var(--s2);border:1px solid var(--s3);color:var(--text);padding:10px 18px;border-radius:12px;font-size:13px;font-weight:600;z-index:400;opacity:0;transition:opacity .25s;pointer-events:none;box-shadow:0 6px 24px rgba(0,0,0,.4);white-space:nowrap";
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+  requestAnimationFrame(() => el.style.opacity = "1");
+  if (_toastT) clearTimeout(_toastT);
+  _toastT = setTimeout(() => { el.style.opacity = "0"; }, 2000);
+}
 
 // Zichtbare sluitknop voor alle sheets (fix voor "onzichtbare terugknop")
 function sheetX() {
@@ -202,16 +217,16 @@ function migrateOldData() {
 
 function ensureDefaults() {
   if (!state.sessionTypes.length) state.sessionTypes = JSON.parse(JSON.stringify(DEFAULT_TYPES));
-  // Sync vanuit defaults naar opgeslagen types (one-way merge) + voeg ONTBREKENDE defaults toe.
-  // (Voorheen bereikten nieuwe default-types bestaande gebruikers nooit.)
+  // Sync vanuit defaults naar opgeslagen types (one-way merge) + voeg ONTBREKENDE defaults toe,
+  // behalve als de gebruiker ze bewust verwijderd heeft (removedDefaultTypes).
+  const removed = state.settings.removedDefaultTypes || [];
   DEFAULT_TYPES.forEach((dt, di) => {
     const existing = state.sessionTypes.find(t => t.id === dt.id);
     if (existing) {
       existing.icon = dt.icon;
       existing.isInterval = dt.isInterval;
       existing.pacePlaceholder = dt.pacePlaceholder;
-    } else {
-      // Invoegen op de default-positie waar mogelijk, anders achteraan
+    } else if (!removed.includes(dt.id)) {
       const insertAt = Math.min(di, state.sessionTypes.length);
       state.sessionTypes.splice(insertAt, 0, JSON.parse(JSON.stringify(dt)));
       console.log(`Nieuw sessietype toegevoegd: ${dt.name}`);

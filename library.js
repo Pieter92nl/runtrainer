@@ -56,18 +56,34 @@ function setTypeLogMode(mode) { window._typeLogMode=mode; $("tp-interval").class
 function saveType(idx) {
   const name = $("tp-name").value.trim(); if (!name) return;
   const isInterval = window._typeLogMode === "interval";
+  const isEdit = idx !== null;
+  const base = isEdit ? { ...state.sessionTypes[idx] } : {};
+  const modeChanged = isEdit && state.sessionTypes[idx].isInterval !== isInterval;
   const obj = {
-    id: idx !== null ? state.sessionTypes[idx].id : name.toLowerCase().replace(/\s+/g,"-")+"-"+Date.now(),
+    ...base,
+    id: isEdit ? state.sessionTypes[idx].id : name.toLowerCase().replace(/\s+/g,"-")+"-"+Date.now(),
     name, icon: $("tp-icon").value || "🏃", color: window._typeColor, colorDim: window._typeColorDim,
-    isInterval,
-    fields:["km","hr","pace","feel","terrain","notes"],
-    hrLabel: isInterval ? "HR intervallen" : "Gem. HR",
-    paceLabel: isInterval ? "Pace intervallen" : "Gem. Pace",
-    pacePlaceholder: isInterval ? "4:00" : "5:30",
-    kmLabel: isInterval ? "Totale afstand incl. w-up/c-down" : "Afstand",
-    hint: isInterval ? "Vul tempo en hartslag van de intervallen in, niet van de hele activiteit" : "Vul het gemiddelde van de hele activiteit in"
+    isInterval
   };
+  // Labels/hints alleen (her)genereren voor nieuwe types of als de logmodus wisselt —
+  // anders blijven bestaande specifieke labels (bijv. "HR blokken" van Long Run Q) behouden.
+  if (!isEdit || modeChanged) {
+    obj.fields = ["km","hr","pace","feel","terrain","notes"];
+    obj.hrLabel = isInterval ? "HR intervallen" : "Gem. HR";
+    obj.paceLabel = isInterval ? "Pace intervallen" : "Gem. Pace";
+    obj.pacePlaceholder = isInterval ? "4:00" : "5:30";
+    obj.kmLabel = isInterval ? "Totale afstand incl. w-up/c-down" : "Afstand";
+    obj.hint = isInterval ? "Vul tempo en hartslag van de intervallen in, niet van de hele activiteit" : "Vul het gemiddelde van de hele activiteit in";
+  }
   if (idx !== null) state.sessionTypes[idx] = obj; else state.sessionTypes.push(obj);
   closeSheet(); save(); render();
 }
-function deleteType(idx) { if (!confirm(`${state.sessionTypes[idx].name} verwijderen?`)) return; state.sessionTypes.splice(idx,1); closeSheet(); save(); render(); }
+function deleteType(idx) {
+  const t = state.sessionTypes[idx];
+  if (!confirm(`${t.name} verwijderen?`)) return;
+  // Onthoud verwijderde default-types, zodat ensureDefaults ze niet elke load terugzet
+  if (DEFAULT_TYPES.find(d => d.id === t.id)) {
+    state.settings.removedDefaultTypes = [...(state.settings.removedDefaultTypes || []), t.id];
+  }
+  state.sessionTypes.splice(idx,1); closeSheet(); save(); render();
+}

@@ -22,6 +22,8 @@ function renderInsights() {
 function insightsPlan(plan) {
   if (!plan) return `<div class="icard"><p style="color:var(--t3);text-align:center;padding:20px">Geen actief plan</p></div>`;
 
+  let bikeSessions = 0;
+
   const wd = plan.weeks.map(w => {
     const pKm = weekPlannedKm(plan, w), aKm = weekLoggedKm(plan, w);
     let feels = [], actHR = [], lt2Paces = [], vo2Paces = [], actPaces = [];
@@ -31,16 +33,22 @@ function insightsPlan(plan) {
       const l = getLog(plan.id, w.week, si);
       const isInt = isIntervalType(s.typeId);
       if (l) {
-        feels.push(l.feel);
-        if (s.typeId === "lt2") {
-          const p = parsePaceToSeconds(l.pace); if (p) lt2Paces.push(p);
-          if (l.actualMinutes) intActualMin += l.actualMinutes;
-        } else if (s.typeId === "vo2max") {
-          const p = parsePaceToSeconds(l.pace); if (p) vo2Paces.push(p);
-          if (l.actualMinutes) intActualMin += l.actualMinutes;
+        if (l.isBike) {
+          // Fietsvervanging: telt mee als gelogd/compliance, niet in loop-pace/HR-trends (andere schaal).
+          feels.push(l.feel);
+          bikeSessions++;
         } else {
-          if (l.hr > 0) actHR.push(l.hr);
-          const p = parsePaceToSeconds(l.pace); if (p) actPaces.push(p);
+          feels.push(l.feel);
+          if (s.typeId === "lt2") {
+            const p = parsePaceToSeconds(l.pace); if (p) lt2Paces.push(p);
+            if (l.actualMinutes) intActualMin += l.actualMinutes;
+          } else if (s.typeId === "vo2max") {
+            const p = parsePaceToSeconds(l.pace); if (p) vo2Paces.push(p);
+            if (l.actualMinutes) intActualMin += l.actualMinutes;
+          } else {
+            if (l.hr > 0) actHR.push(l.hr);
+            const p = parsePaceToSeconds(l.pace); if (p) actPaces.push(p);
+          }
         }
       }
       if (isInt && s.plannedMinutes) intPlannedMin += s.plannedMinutes;
@@ -56,33 +64,34 @@ function insightsPlan(plan) {
   const tP = wd.reduce((a,w) => a+w.pKm, 0), tA = wd.reduce((a,w) => a+w.aKm, 0), tS = wd.reduce((a,w) => a+w.sL, 0);
   const mx = Math.max(...wd.map(w => Math.max(w.pKm, w.aKm)), 1);
 
-  // Compliance: only count planned km of sessions that have been logged
+  // Compliance: only count planned km of sessions that have been logged (fietsvervangingen tellen niet mee in km)
   let compPlanned = 0, compActual = 0;
   plan.weeks.forEach(w => w.sessions.forEach((s, si) => {
     const l = getLog(plan.id, w.week, si);
-    if (l) { compPlanned += s.plannedKm || 0; compActual += l.km || 0; }
+    if (l && !l.isBike) { compPlanned += s.plannedKm || 0; compActual += l.km || 0; }
   }));
   const compPct = compPlanned > 0 ? Math.round((compActual - compPlanned) / compPlanned * 100) : 0;
   const compColor = Math.abs(compPct) <= 5 ? "var(--green)" : compPct > 0 ? "var(--blue)" : "var(--red)";
   const compLabel = compPct > 0 ? `${compPct}% boven schema` : compPct < 0 ? `${Math.abs(compPct)}% onder schema` : "Op schema";
   const compBarPct = compPlanned > 0 ? Math.min(100, Math.round(compActual / compPlanned * 100)) : 0;
 
-  // Per session type km
+  // Per session type km (fietsvervangingen tellen niet mee in de km, wel in aantal gelogd via 'a' blijft 0 bijdrage)
   const typeTotals = {};
   plan.weeks.forEach(w => w.sessions.forEach((s,si) => {
     if (!typeTotals[s.typeId]) typeTotals[s.typeId] = {p:0,a:0,pMin:0,aMin:0};
     typeTotals[s.typeId].p += s.plannedKm || 0;
     if (isIntervalType(s.typeId) && s.plannedMinutes) typeTotals[s.typeId].pMin += s.plannedMinutes * 60; // store as seconds
     const l = getLog(plan.id, w.week, si);
-    if (l) { typeTotals[s.typeId].a += l.km || 0; if (l.actualMinutes) typeTotals[s.typeId].aMin += l.actualMinutes; }
+    if (l && !l.isBike) { typeTotals[s.typeId].a += l.km || 0; if (l.actualMinutes) typeTotals[s.typeId].aMin += l.actualMinutes; }
   }));
 
   return `
   <div class="icard"><h3>Compliance — ${plan.name}</h3>
     <div class="big">${Math.round(tA)} <span>/ ${Math.round(tP)} km</span></div>
-    <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
+    <div style="display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap">
       <span style="font-size:14px;font-weight:700;color:${compColor}">${tS > 0 ? compLabel : "Nog geen sessies gelogd"}</span>
       <span style="font-size:12px;color:var(--t3)">${tS} sessies gelogd</span>
+      ${bikeSessions > 0 ? `<span style="font-size:12px;color:var(--teal)">🚴 ${bikeSessions} vervangen door fietsen</span>` : ""}
     </div>
     <div style="height:8px;background:var(--s3);border-radius:5px;overflow:hidden;margin-top:12px"><div style="height:100%;width:${compBarPct}%;background:var(--orange);border-radius:5px"></div></div>
   </div>
@@ -143,13 +152,15 @@ function insightsPlan(plan) {
 // ═══════════ PER SESSION TYPE ═══════════
 function insightsType() {
   const typeData = {};
+  let bikeByType = {};
   for (const plan of state.plans) for (const w of plan.weeks) w.sessions.forEach((s,si) => {
     const l = getLog(plan.id, w.week, si); if (!l) return;
+    if (l.isBike) { bikeByType[s.typeId] = (bikeByType[s.typeId] || 0) + 1; return; } // apart gehouden — andere schaal dan lopen
     if (!typeData[s.typeId]) typeData[s.typeId] = [];
     typeData[s.typeId].push({...l, calWeek:w.calWeek, year:w.year, planName:plan.name, plannedMinutes:s.plannedMinutes});
   });
-  if (!Object.keys(typeData).length) return `<div class="icard"><p style="color:var(--t3);text-align:center;padding:20px">Nog geen data</p></div>`;
-  return Object.entries(typeData).map(([tid,entries]) => {
+  if (!Object.keys(typeData).length && !Object.keys(bikeByType).length) return `<div class="icard"><p style="color:var(--t3);text-align:center;padding:20px">Nog geen data</p></div>`;
+  const cards = Object.entries(typeData).map(([tid,entries]) => {
     const tp = getType(tid), isInt = isIntervalType(tid);
     const sorted = entries.sort((a,b)=>(a.year*100+a.calWeek)-(b.year*100+b.calWeek));
     const avgKm = sorted.reduce((s,e)=>s+e.km,0)/sorted.length;
@@ -157,7 +168,8 @@ function insightsType() {
     const paces = sorted.map(e=>parsePaceToSeconds(e.pace)).filter(Boolean);
     const totalPlanSec = isInt ? sorted.reduce((s,e)=>s+((e.plannedMinutes||0)*60),0) : 0;
     const totalActSec = isInt ? sorted.reduce((s,e)=>s+(e.actualMinutes||0),0) : 0;
-    return `<div class="icard"><h3>${tp.icon} ${tp.name} — ${sorted.length} sessies</h3>
+    const bikeCount = bikeByType[tid] || 0;
+    return `<div class="icard"><h3>${tp.icon} ${tp.name} — ${sorted.length} sessies${bikeCount?` <span style="color:var(--teal);font-weight:500">· 🚴 ${bikeCount}</span>`:""}</h3>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px">
         <div><div style="font-size:10px;color:var(--t3);margin-bottom:2px">Gem. km</div><div style="font-size:18px;font-weight:700">${avgKm.toFixed(1)}</div></div>
         <div><div style="font-size:10px;color:var(--t3);margin-bottom:2px">Gem. HR</div><div style="font-size:18px;font-weight:700">${hrs.length?Math.round(hrs.reduce((a,b)=>a+b,0)/hrs.length):"–"}</div></div>
@@ -166,19 +178,29 @@ function insightsType() {
       ${isInt && totalPlanSec > 0 ? `<div style="font-size:13px;color:var(--t2);margin-bottom:8px">Totaal tijd op intensiteit: <span style="font-weight:700">${fmtMinSec(totalActSec)}</span> <span style="color:var(--t3)">/ ${fmtMinSec(totalPlanSec)} gepland</span></div>` : ""}
       ${paces.length>1?`<div style="display:flex;align-items:flex-end;gap:4px;height:50px;margin-top:8px">${sorted.filter(e=>parsePaceToSeconds(e.pace)).map(e=>{const p=parsePaceToSeconds(e.pace),mn=Math.min(...paces)-10,mx2=Math.max(...paces)+10,h=Math.round((1-(p-mn)/(mx2-mn))*45);return`<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px"><div style="font-size:8px;color:var(--t3);font-family:var(--mono)">${secondsToPace(p)}</div><div style="width:100%;height:${Math.max(2,h)}px;background:${tp.color};border-radius:2px 2px 0 0"></div></div>`;}).join("")}</div>`:""}</div>`;
   }).join("");
+
+  // Types die alléén fietsvervangingen hebben (nooit als run gelogd)
+  const bikeOnly = Object.entries(bikeByType).filter(([tid]) => !typeData[tid]).map(([tid,count]) => {
+    const tp = getType(tid);
+    return `<div class="icard"><h3>${tp.icon} ${tp.name} — <span style="color:var(--teal)">🚴 ${count} fietsvervanging${count>1?"en":""}</span></h3></div>`;
+  }).join("");
+
+  return cards + bikeOnly;
 }
 
 // ═══════════ YEAR OVERVIEW ═══════════
 function insightsYear() {
-  const year = new Date().getFullYear(); let totalKm=0,totalSessions=0,weeksActive=0; const weekKms={};
-  for (const plan of state.plans) for (const w of plan.weeks) { if(w.year!==year) continue; const km=weekLoggedKm(plan,w); if(km>0){totalKm+=km;weeksActive++;weekKms[w.calWeek]=(weekKms[w.calWeek]||0)+km;} w.sessions.forEach((_,si)=>{if(getLog(plan.id,w.week,si))totalSessions++;}); }
+  const year = new Date().getFullYear(); let totalKm=0,totalSessions=0,weeksActive=0,bikeReplacements=0; const weekKms={};
+  for (const plan of state.plans) for (const w of plan.weeks) { if(w.year!==year) continue; const km=weekLoggedKm(plan,w); if(km>0){totalKm+=km;weeksActive++;weekKms[w.calWeek]=(weekKms[w.calWeek]||0)+km;} w.sessions.forEach((_,si)=>{const l=getLog(plan.id,w.week,si); if(l){totalSessions++; if(l.isBike) bikeReplacements++;}}); }
   const maxWk = Math.max(...Object.values(weekKms),1), cw = getCurrentCalWeek();
   return `<div class="icard"><h3>Jaar ${year}</h3>
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
       <div><div style="font-size:10px;color:var(--t3);margin-bottom:2px">Totaal km</div><div style="font-size:22px;font-weight:700">${totalKm.toFixed(1)}</div></div>
       <div><div style="font-size:10px;color:var(--t3);margin-bottom:2px">Sessies</div><div style="font-size:22px;font-weight:700">${totalSessions}</div></div>
       <div><div style="font-size:10px;color:var(--t3);margin-bottom:2px">Actieve weken</div><div style="font-size:22px;font-weight:700">${weeksActive}</div></div>
-    </div></div>
+    </div>
+    ${bikeReplacements>0?`<div style="font-size:12px;color:var(--teal);margin-top:10px">🚴 ${bikeReplacements} sessies vervangen door fietsen (niet in km-totaal)</div>`:""}
+    </div>
   <div class="icard"><h3>Volume per week</h3>${Object.keys(weekKms).length?`<div style="display:flex;align-items:flex-end;gap:3px;height:80px">${Object.entries(weekKms).sort((a,b)=>a[0]-b[0]).map(([c,km])=>{const h=Math.round(km/maxWk*70);return`<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px"><div style="font-size:8px;color:var(--t3);font-family:var(--mono)">${km.toFixed(0)}</div><div style="width:100%;height:${h}px;background:${parseInt(c)===cw?"var(--orange)":"var(--blue)"};border-radius:2px 2px 0 0"></div><div style="font-size:8px;color:var(--t3)">${c}</div></div>`;}).join("")}</div>`:`<div style="color:var(--t3);text-align:center;padding:20px">Nog geen data</div>`}</div>
   <div class="icard"><h3>Consistentie</h3><p style="font-size:14px;color:var(--t2);line-height:1.6">${weeksActive>0?`${weeksActive} van ${cw} weken getraind (${Math.round(weeksActive/cw*100)}%)`:""}</p></div>`;
 }
